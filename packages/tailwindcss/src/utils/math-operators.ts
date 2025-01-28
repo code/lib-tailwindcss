@@ -1,4 +1,4 @@
-const mathFunctions = [
+const MATH_FUNCTIONS = [
   'calc',
   'min',
   'max',
@@ -20,19 +20,27 @@ const mathFunctions = [
   'round',
 ]
 
+const KNOWN_DASHED_FUNCTIONS = ['anchor-size']
+const DASHED_FUNCTIONS_REGEX = new RegExp(`(${KNOWN_DASHED_FUNCTIONS.join('|')})\\(`, 'g')
+
 export function hasMathFn(input: string) {
-  return input.indexOf('(') !== -1 && mathFunctions.some((fn) => input.includes(`${fn}(`))
+  return input.indexOf('(') !== -1 && MATH_FUNCTIONS.some((fn) => input.includes(`${fn}(`))
 }
 
 export function addWhitespaceAroundMathOperators(input: string) {
-  // There's definitely no functions in the input, so bail early
-  if (input.indexOf('(') === -1) {
+  // Bail early if there are no math functions in the input
+  if (!MATH_FUNCTIONS.some((fn) => input.includes(fn))) {
     return input
   }
 
-  // Bail early if there are no math functions in the input
-  if (!mathFunctions.some((fn) => input.includes(fn))) {
-    return input
+  // Replace known functions with a placeholder
+  let hasKnownFunctions = false
+  if (KNOWN_DASHED_FUNCTIONS.some((fn) => input.includes(fn))) {
+    DASHED_FUNCTIONS_REGEX.lastIndex = 0
+    input = input.replace(DASHED_FUNCTIONS_REGEX, (_, fn) => {
+      hasKnownFunctions = true
+      return `$${KNOWN_DASHED_FUNCTIONS.indexOf(fn)}$(`
+    })
   }
 
   let result = ''
@@ -64,7 +72,7 @@ export function addWhitespaceAroundMathOperators(input: string) {
       let fn = input.slice(start, i)
 
       // This is a known math function so start formatting
-      if (mathFunctions.includes(fn)) {
+      if (MATH_FUNCTIONS.includes(fn)) {
         formattable.unshift(true)
         continue
       }
@@ -148,6 +156,10 @@ export function addWhitespaceAroundMathOperators(input: string) {
     else {
       result += char
     }
+  }
+
+  if (hasKnownFunctions) {
+    return result.replace(/\$(\d+)\$/g, (fn, idx) => KNOWN_DASHED_FUNCTIONS[idx] ?? fn)
   }
 
   return result

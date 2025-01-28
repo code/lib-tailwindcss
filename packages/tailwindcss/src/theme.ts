@@ -1,11 +1,50 @@
+import type { AtRule } from './ast'
 import { escape } from './utils/escape'
 
+export const enum ThemeOptions {
+  NONE = 0,
+  INLINE = 1 << 0,
+  REFERENCE = 1 << 1,
+  DEFAULT = 1 << 2,
+}
+
+// In the future we may want to replace this with just a `Set` of known theme
+// keys and let the computer sort out which keys should ignored which other keys
+// based on overlapping prefixes.
+const ignoredThemeKeyMap = new Map([
+  ['--font', ['--font-weight', '--font-size']],
+  ['--inset', ['--inset-shadow', '--inset-ring']],
+  [
+    '--text',
+    [
+      '--text-color',
+      '--text-underline-offset',
+      '--text-indent',
+      '--text-decoration-thickness',
+      '--text-decoration-color',
+    ],
+  ],
+])
+
+function isIgnoredThemeKey(themeKey: ThemeKey, namespace: ThemeKey) {
+  return (ignoredThemeKeyMap.get(namespace) ?? []).some(
+    (ignoredThemeKey) => themeKey === ignoredThemeKey || themeKey.startsWith(`${ignoredThemeKey}-`),
+  )
+}
+
 export class Theme {
+  public prefix: string | null = null
+
   constructor(
-    private values = new Map<string, { value: string; isReference: boolean; isInline: boolean }>(),
+    private values = new Map<string, { value: string; options: ThemeOptions }>(),
+    private keyframes = new Set<AtRule>([]),
   ) {}
 
-  add(key: string, value: string, { isReference = false, isInline = false } = {}): void {
+  add(key: string, value: string, options = ThemeOptions.NONE): void {
+    if (key.endsWith('\\*')) {
+      key = key.slice(0, -2) + '*'
+    }
+
     if (key.endsWith('-*')) {
       if (value !== 'initial') {
         throw new Error(`Invalid theme value \`${value}\` for namespace \`${key}\``)
@@ -13,38 +52,49 @@ export class Theme {
       if (key === '--*') {
         this.values.clear()
       } else {
-        this.#clearNamespace(key.slice(0, -2))
+        this.clearNamespace(
+          key.slice(0, -2),
+          // `--${key}-*: initial;` should clear _all_ theme values
+          ThemeOptions.NONE,
+        )
       }
+    }
+
+    if (options & ThemeOptions.DEFAULT) {
+      let existing = this.values.get(key)
+      if (existing && !(existing.options & ThemeOptions.DEFAULT)) return
     }
 
     if (value === 'initial') {
       this.values.delete(key)
     } else {
-      this.values.set(key, { value, isReference, isInline })
+      this.values.set(key, { value, options })
     }
   }
 
-  keysInNamespaces(themeKeys: ThemeKey[]): string[] {
+  keysInNamespaces(themeKeys: Iterable<ThemeKey>): string[] {
     let keys: string[] = []
 
-    for (let prefix of themeKeys) {
-      let namespace = `${prefix}-`
+    for (let namespace of themeKeys) {
+      let prefix = `${namespace}-`
 
       for (let key of this.values.keys()) {
-        if (key.startsWith(namespace)) {
-          if (key.indexOf('--', 2) !== -1) {
-            continue
-          }
+        if (!key.startsWith(prefix)) continue
 
-          keys.push(key.slice(namespace.length))
+        if (key.indexOf('--', 2) !== -1) continue
+
+        if (isIgnoredThemeKey(key as ThemeKey, namespace)) {
+          continue
         }
+
+        keys.push(key.slice(prefix.length))
       }
     }
 
     return keys
   }
 
-  get(themeKeys: (ThemeKey | `${ThemeKey}-${string}`)[]): string | null {
+  get(themeKeys: ThemeKey[]): string | null {
     for (let key of themeKeys) {
       let value = this.values.get(key)
       if (value) {
@@ -55,26 +105,58 @@ export class Theme {
     return null
   }
 
-  entries() {
-    return this.values.entries()
+  hasDefault(key: string): boolean {
+    return (this.getOptions(key) & ThemeOptions.DEFAULT) === ThemeOptions.DEFAULT
   }
 
-  #clearNamespace(namespace: string) {
-    for (let key of this.values.keys()) {
+  getOptions(key: string) {
+    return this.values.get(key)?.options ?? ThemeOptions.NONE
+  }
+
+  entries() {
+    if (!this.prefix) return this.values.entries()
+
+    return Array.from(this.values, (entry) => {
+      entry[0] = this.#prefixKey(entry[0])
+      return entry
+    })
+  }
+
+  #prefixKey(key: string) {
+    if (!this.prefix) return key
+    return `--${this.prefix}-${key.slice(2)}`
+  }
+
+  clearNamespace(namespace: string, clearOptions: ThemeOptions) {
+    let ignored = ignoredThemeKeyMap.get(namespace) ?? []
+
+    outer: for (let key of this.values.keys()) {
       if (key.startsWith(namespace)) {
+        if (clearOptions !== ThemeOptions.NONE) {
+          let options = this.getOptions(key)
+          if ((options & clearOptions) !== clearOptions) {
+            continue
+          }
+        }
+        for (let ignoredNamespace of ignored) {
+          if (key.startsWith(ignoredNamespace)) continue outer
+        }
         this.values.delete(key)
       }
     }
   }
 
   #resolveKey(candidateValue: string | null, themeKeys: ThemeKey[]): string | null {
-    for (let key of themeKeys) {
+    for (let namespace of themeKeys) {
       let themeKey =
-        candidateValue !== null ? escape(`${key}-${candidateValue.replaceAll('.', '_')}`) : key
+        candidateValue !== null
+          ? (escape(`${namespace}-${candidateValue.replaceAll('.', '_')}`) as ThemeKey)
+          : namespace
 
-      if (this.values.has(themeKey)) {
-        return themeKey
-      }
+      if (!this.values.has(themeKey)) continue
+      if (isIgnoredThemeKey(themeKey, namespace)) continue
+
+      return themeKey
     }
 
     return null
@@ -85,7 +167,7 @@ export class Theme {
       return null
     }
 
-    return `var(${themeKey}, ${this.values.get(themeKey)?.value})`
+    return `var(${this.#prefixKey(themeKey)})`
   }
 
   resolve(candidateValue: string | null, themeKeys: ThemeKey[]): string | null {
@@ -95,7 +177,7 @@ export class Theme {
 
     let value = this.values.get(themeKey)!
 
-    if (value.isInline) {
+    if (value.options & ThemeOptions.INLINE) {
       return value.value
     }
 
@@ -121,10 +203,21 @@ export class Theme {
 
     let extra = {} as Record<string, string>
     for (let name of nestedKeys) {
-      let nestedValue = this.#var(`${themeKey}${name}`)
-      if (nestedValue) {
-        extra[name] = nestedValue
+      let nestedKey = `${themeKey}${name}`
+      let nestedValue = this.values.get(nestedKey)!
+      if (!nestedValue) continue
+
+      if (nestedValue.options & ThemeOptions.INLINE) {
+        extra[name] = nestedValue.value
+      } else {
+        extra[name] = this.#var(nestedKey)!
       }
+    }
+
+    let value = this.values.get(themeKey)!
+
+    if (value.options & ThemeOptions.INLINE) {
+      return [value.value, extra]
     }
 
     return [this.#var(themeKey)!, extra]
@@ -137,6 +230,10 @@ export class Theme {
     for (let [key, value] of this.values) {
       if (key === namespace) {
         values.set(null, value.value)
+      } else if (key.startsWith(`${prefix}-`)) {
+        // Preserve `--` prefix for sub-variables
+        // e.g. `--font-size-sm--line-height`
+        values.set(key.slice(namespace.length), value.value)
       } else if (key.startsWith(prefix)) {
         values.set(key.slice(prefix.length), value.value)
       }
@@ -144,131 +241,14 @@ export class Theme {
 
     return values
   }
+
+  addKeyframes(value: AtRule): void {
+    this.keyframes.add(value)
+  }
+
+  getKeyframes() {
+    return Array.from(this.keyframes)
+  }
 }
 
-export type ThemeKey =
-  | '--accent-color'
-  | '--animate'
-  | '--aspect-ratio'
-  | '--backdrop-blur'
-  | '--backdrop-brightness'
-  | '--backdrop-contrast'
-  | '--backdrop-grayscale'
-  | '--backdrop-hue-rotate'
-  | '--backdrop-invert'
-  | '--backdrop-opacity'
-  | '--backdrop-saturate'
-  | '--backdrop-sepia'
-  | '--background-color'
-  | '--background-image'
-  | '--blur'
-  | '--border-color'
-  | '--border-spacing'
-  | '--border-width'
-  | '--box-shadow-color'
-  | '--breakpoint'
-  | '--brightness'
-  | '--caret-color'
-  | '--color'
-  | '--columns'
-  | '--contrast'
-  | '--cursor'
-  | '--default-border-width'
-  | '--default-ring-color'
-  | '--default-ring-width'
-  | '--default-transition-timing-function'
-  | '--default-transition-duration'
-  | '--divide-width'
-  | '--divide-color'
-  | '--drop-shadow'
-  | '--fill'
-  | '--flex-basis'
-  | '--font-family'
-  | '--font-size'
-  | '--font-weight'
-  | '--gap'
-  | '--gradient-color-stop-positions'
-  | '--grayscale'
-  | '--grid-auto-columns'
-  | '--grid-auto-rows'
-  | '--grid-column'
-  | '--grid-column-end'
-  | '--grid-column-start'
-  | '--grid-row'
-  | '--grid-row-end'
-  | '--grid-row-start'
-  | '--grid-template-columns'
-  | '--grid-template-rows'
-  | '--height'
-  | '--hue-rotate'
-  | '--inset'
-  | '--inset-shadow'
-  | '--invert'
-  | '--letter-spacing'
-  | '--line-height'
-  | '--line-clamp'
-  | '--list-style-image'
-  | '--list-style-type'
-  | '--margin'
-  | '--max-height'
-  | '--max-width'
-  | '--min-height'
-  | '--min-width'
-  | '--object-position'
-  | '--opacity'
-  | '--order'
-  | '--outline-color'
-  | '--outline-width'
-  | '--outline-offset'
-  | '--padding'
-  | '--placeholder-color'
-  | '--perspective'
-  | '--perspective-origin'
-  | '--radius'
-  | '--ring-color'
-  | '--ring-offset-color'
-  | '--ring-offset-width'
-  | '--ring-width'
-  | '--rotate'
-  | '--saturate'
-  | '--scale'
-  | '--scroll-margin'
-  | '--scroll-padding'
-  | '--sepia'
-  | '--shadow'
-  | '--size'
-  | '--skew'
-  | '--space'
-  | '--spacing'
-  | '--stroke'
-  | '--stroke-width'
-  | '--text-color'
-  | '--text-decoration-color'
-  | '--text-decoration-thickness'
-  | '--text-indent'
-  | '--text-underline-offset'
-  | '--transform-origin'
-  | '--transition-delay'
-  | '--transition-duration'
-  | '--transition-property'
-  | '--transition-timing-function'
-  | '--translate'
-  | '--width'
-  | '--z-index'
-
-export type ColorThemeKey =
-  | '--color'
-  | '--accent-color'
-  | '--background-color'
-  | '--border-color'
-  | '--box-shadow-color'
-  | '--caret-color'
-  | '--divide-color'
-  | '--fill'
-  | '--outline-color'
-  | '--placeholder-color'
-  | '--ring-color'
-  | '--ring-offset-color'
-  | '--stroke'
-  | '--text-color'
-  | '--text-decoration-color'
+export type ThemeKey = `--${string}`

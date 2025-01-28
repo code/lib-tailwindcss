@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
-import { IO, Parsing, scanFiles } from '@tailwindcss/oxide'
-import fs from 'fs'
-import path from 'path'
+import { Scanner } from '@tailwindcss/oxide'
+import fs from 'node:fs'
+import path from 'node:path'
 import { compile } from '../src'
 import { optimizeCss } from '../src/test-utils/run'
 
@@ -28,53 +28,76 @@ test('touch action', async ({ page }) => {
 })
 
 for (let [classes, expected] of [
-  ['from-red-500', 'linear-gradient(to right, rgb(239, 68, 68) 0%, rgba(0, 0, 0, 0) 100%)'],
   [
-    'via-red-500',
-    'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(239, 68, 68) 50%, rgba(0, 0, 0, 0) 100%)',
-  ],
-  ['to-red-500', 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(239, 68, 68) 100%)'],
-  [
-    'from-red-500 to-blue-500',
-    'linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(59, 130, 246) 100%)',
+    'bg-linear-to-r from-red',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 100%)',
   ],
   [
-    'via-red-500 to-blue-500',
-    'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(239, 68, 68) 50%, rgb(59, 130, 246) 100%)',
+    'bg-linear-to-r via-red',
+    'linear-gradient(to right in oklab, rgba(0, 0, 0, 0) 0%, rgb(255, 0, 0) 50%, rgba(0, 0, 0, 0) 100%)',
   ],
   [
-    'from-red-500 via-green-500 to-blue-500',
-    'linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(34, 197, 94) 50%, rgb(59, 130, 246) 100%)',
+    'bg-linear-to-r to-red',
+    'linear-gradient(to right in oklab, rgba(0, 0, 0, 0) 0%, rgb(255, 0, 0) 100%)',
+  ],
+  [
+    'bg-linear-to-r from-red to-blue',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
+  ],
+  [
+    'bg-linear-45 from-red to-blue',
+    'linear-gradient(45deg in oklab, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
+  ],
+  [
+    '-bg-linear-45 from-red to-blue',
+    // Chrome reports a different (but also correct) computed value than Firefox/WebKit so we check
+    // for both options.
+    [
+      'linear-gradient(-45deg in oklab, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
+      'linear-gradient(calc(-45deg) in oklab, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
+    ],
+  ],
+  [
+    'bg-linear-to-r via-red to-blue',
+    'linear-gradient(to right in oklab, rgba(0, 0, 0, 0) 0%, rgb(255, 0, 0) 50%, rgb(0, 0, 255) 100%)',
+  ],
+  [
+    'bg-linear-to-r from-red via-green to-blue',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgb(0, 255, 0) 50%, rgb(0, 0, 255) 100%)',
+  ],
+  [
+    'bg-linear-[to_right,var(--color-red),var(--color-green),var(--color-blue)]',
+    'linear-gradient(to right, rgb(255, 0, 0), rgb(0, 255, 0), rgb(0, 0, 255))',
   ],
 ]) {
   test(`background gradient, "${classes}"`, async ({ page }) => {
     let { getPropertyValue } = await render(
       page,
-      html`<div id="x" class="bg-gradient-to-r ${classes}">Hello world</div>`,
+      html`<div id="x" class="${classes}">Hello world</div>`,
     )
 
-    expect(await getPropertyValue('#x', 'background-image')).toEqual(expected)
+    if (Array.isArray(expected)) {
+      expect(expected).toContain(await getPropertyValue('#x', 'background-image'))
+    } else {
+      expect(await getPropertyValue('#x', 'background-image')).toEqual(expected)
+    }
   })
 }
 
 test('background gradient, going from 2 to 3', async ({ page }) => {
   let { getPropertyValue } = await render(
     page,
-    html`
-      <div id="x" class="bg-gradient-to-r from-red-500 hover:via-green-500 to-blue-500">
-        Hello world
-      </div>
-    `,
+    html` <div id="x" class="bg-gradient-to-r from-red hover:via-green to-blue">Hello world</div> `,
   )
 
   expect(await getPropertyValue('#x', 'background-image')).toEqual(
-    'linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(59, 130, 246) 100%)',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
   )
 
   await page.locator('#x').hover()
 
   expect(await getPropertyValue('#x', 'background-image')).toEqual(
-    'linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(34, 197, 94) 50%, rgb(59, 130, 246) 100%)',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgb(0, 255, 0) 50%, rgb(0, 0, 255) 100%)',
   )
 })
 
@@ -82,22 +105,68 @@ test('background gradient, going from 3 to 2', async ({ page }) => {
   let { getPropertyValue } = await render(
     page,
     html`
-      <div id="x" class="bg-gradient-to-r from-red-500 via-green-500 hover:via-none to-blue-500">
+      <div id="x" class="bg-gradient-to-r from-red via-green hover:via-none to-blue">
         Hello world
       </div>
     `,
   )
 
   expect(await getPropertyValue('#x', 'background-image')).toEqual(
-    'linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(34, 197, 94) 50%, rgb(59, 130, 246) 100%)',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgb(0, 255, 0) 50%, rgb(0, 0, 255) 100%)',
   )
 
   await page.locator('#x').hover()
 
   expect(await getPropertyValue('#x', 'background-image')).toEqual(
-    'linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(59, 130, 246) 100%)',
+    'linear-gradient(to right in oklab, rgb(255, 0, 0) 0%, rgb(0, 0, 255) 100%)',
   )
 })
+
+for (let [classes, expected] of [
+  ['bg-conic from-red', 'conic-gradient(in oklab, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 100%)'],
+  [
+    'bg-conic-45 from-red',
+    'conic-gradient(from 45deg in oklab, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 100%)',
+  ],
+  [
+    'bg-conic-[from_45deg] from-red',
+    'conic-gradient(from 45deg, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 100%)',
+  ],
+  [
+    'bg-conic-[from_45deg,var(--color-red),transparent]',
+    'conic-gradient(from 45deg, rgb(255, 0, 0), rgba(0, 0, 0, 0))',
+  ],
+]) {
+  test(`conic gradient, "${classes}"`, async ({ page }) => {
+    let { getPropertyValue } = await render(
+      page,
+      html`<div id="x" class="${classes}">Hello world</div>`,
+    )
+
+    expect(await getPropertyValue('#x', 'background-image')).toEqual(expected)
+  })
+}
+
+for (let [classes, expected] of [
+  ['bg-radial from-red', 'radial-gradient(in oklab, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 100%)'],
+  [
+    'bg-radial-[at_0%_0%] from-red',
+    'radial-gradient(at 0% 0%, rgb(255, 0, 0) 0%, rgba(0, 0, 0, 0) 100%)',
+  ],
+  [
+    'bg-radial-[at_0%_0%,var(--color-red),transparent]',
+    'radial-gradient(at 0% 0%, rgb(255, 0, 0), rgba(0, 0, 0, 0))',
+  ],
+]) {
+  test(`radial gradient, "${classes}"`, async ({ page }) => {
+    let { getPropertyValue } = await render(
+      page,
+      html`<div id="x" class="${classes}">Hello world</div>`,
+    )
+
+    expect(await getPropertyValue('#x', 'background-image')).toEqual(expected)
+  })
+}
 
 test("::backdrop can receive a border with just the 'border' utility", async ({ page }) => {
   let { getPropertyValue } = await render(
@@ -145,17 +214,17 @@ test('composing shadow, inset shadow, ring, and inset ring', async ({ page }) =>
     page,
     html`<div
       id="x"
-      class="shadow shadow-[#f00]/50 inset-shadow inset-shadow-[#0f0]/50 ring ring-[#fff]/50 inset-ring inset-ring-[#00f]/50"
+      class="shadow-sm shadow-[#f00] inset-shadow-sm inset-shadow-[#0f0] ring ring-[#fff] inset-ring inset-ring-[#00f]"
     ></div>`,
   )
 
   expect(await getPropertyValue('#x', 'box-shadow')).toEqual(
     [
-      'rgba(0, 255, 0, 0.5) 0px 2px 4px 0px inset', // inset-shadow
-      'rgba(0, 0, 255, 0.5) 0px 0px 0px 1px inset', // inset-ring
+      'rgb(0, 255, 0) 0px 2px 4px 0px inset', // inset-shadow
+      'rgb(0, 0, 255) 0px 0px 0px 1px inset', // inset-ring
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px', // ring-offset (disabled)
-      'rgba(255, 255, 255, 0.5) 0px 0px 0px 1px', // ring
-      'rgba(255, 0, 0, 0.5) 0px 1px 3px 0px, rgba(255, 0, 0, 0.5) 0px 1px 2px -1px', // shadow
+      'rgb(255, 255, 255) 0px 0px 0px 1px', // ring
+      'rgb(255, 0, 0) 0px 1px 3px 0px, rgb(255, 0, 0) 0px 1px 2px -1px', // shadow
     ].join(', '),
   )
 })
@@ -164,37 +233,175 @@ test('shadow colors', async ({ page }) => {
   let { getPropertyValue } = await render(
     page,
     html`
-      <div id="x" class="shadow shadow-red-500"></div>
-      <div id="y" class="shadow-xl shadow-red-500"></div>
-      <div id="z" class="shadow-[0px_2px_4px] shadow-red-500"></div>
+      <div id="a" class="shadow-sm shadow-red"></div>
+      <div id="b" class="shadow-xl shadow-red"></div>
+      <div id="c" class="shadow-[0px_2px_4px] shadow-red"></div>
+      <div id="d" class="shadow-sm shadow-red hover:shadow-xl">Hello world</div>
+      <div id="e" class="shadow-sm shadow-red hover:shadow-xl hover:shadow-initial">
+        Hello world
+      </div>
     `,
   )
 
-  expect(await getPropertyValue('#x', 'box-shadow')).toEqual(
+  expect(await getPropertyValue('#a', 'box-shadow')).toEqual(
     [
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
-      'rgb(239, 68, 68) 0px 1px 3px 0px, rgb(239, 68, 68) 0px 1px 2px -1px',
+      'rgb(255, 0, 0) 0px 1px 3px 0px, rgb(255, 0, 0) 0px 1px 2px -1px',
     ].join(', '),
   )
-  expect(await getPropertyValue('#y', 'box-shadow')).toEqual(
+  expect(await getPropertyValue('#b', 'box-shadow')).toEqual(
     [
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
-      'rgb(239, 68, 68) 0px 20px 25px -5px, rgb(239, 68, 68) 0px 8px 10px -6px',
+      'rgb(255, 0, 0) 0px 20px 25px -5px, rgb(255, 0, 0) 0px 8px 10px -6px',
     ].join(', '),
   )
-  expect(await getPropertyValue('#z', 'box-shadow')).toEqual(
+  expect(await getPropertyValue('#c', 'box-shadow')).toEqual(
     [
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
       'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
-      'rgb(239, 68, 68) 0px 2px 4px 0px',
+      'rgb(255, 0, 0) 0px 2px 4px 0px',
+    ].join(', '),
+  )
+
+  expect(await getPropertyValue('#d', 'box-shadow')).toEqual(
+    [
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgb(255, 0, 0) 0px 1px 3px 0px, rgb(255, 0, 0) 0px 1px 2px -1px',
+    ].join(', '),
+  )
+
+  await page.locator('#d').hover()
+
+  expect(await getPropertyValue('#d', 'box-shadow')).toEqual(
+    [
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgb(255, 0, 0) 0px 20px 25px -5px, rgb(255, 0, 0) 0px 8px 10px -6px',
+    ].join(', '),
+  )
+
+  expect(await getPropertyValue('#e', 'box-shadow')).toEqual(
+    [
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgb(255, 0, 0) 0px 1px 3px 0px, rgb(255, 0, 0) 0px 1px 2px -1px',
+    ].join(', '),
+  )
+
+  await page.locator('#e').hover()
+
+  expect(await getPropertyValue('#e', 'box-shadow')).toEqual(
+    [
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0.1) 0px 20px 25px -5px, rgba(0, 0, 0, 0.1) 0px 8px 10px -6px',
+    ].join(', '),
+  )
+})
+
+test('inset shadow colors', async ({ page }) => {
+  let { getPropertyValue } = await render(
+    page,
+    html`
+      <div id="a" class="inset-shadow-xs inset-shadow-red"></div>
+      <div id="b" class="inset-shadow-sm inset-shadow-red"></div>
+      <div id="c" class="inset-shadow-[0px_3px_6px] inset-shadow-red"></div>
+      <div id="d" class="inset-shadow-xs inset-shadow-red hover:inset-shadow-sm">Hello world</div>
+      <div
+        id="e"
+        class="inset-shadow-xs inset-shadow-red hover:inset-shadow-sm hover:inset-shadow-initial"
+      >
+        Hello world
+      </div>
+    `,
+  )
+
+  expect(await getPropertyValue('#a', 'box-shadow')).toEqual(
+    [
+      'rgb(255, 0, 0) 0px 1px 1px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+    ].join(', '),
+  )
+  expect(await getPropertyValue('#b', 'box-shadow')).toEqual(
+    [
+      'rgb(255, 0, 0) 0px 2px 4px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+    ].join(', '),
+  )
+  expect(await getPropertyValue('#c', 'box-shadow')).toEqual(
+    [
+      'rgb(255, 0, 0) 0px 3px 6px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+    ].join(', '),
+  )
+
+  expect(await getPropertyValue('#d', 'box-shadow')).toEqual(
+    [
+      'rgb(255, 0, 0) 0px 1px 1px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+    ].join(', '),
+  )
+
+  await page.locator('#d').hover()
+
+  expect(await getPropertyValue('#d', 'box-shadow')).toEqual(
+    [
+      'rgb(255, 0, 0) 0px 2px 4px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+    ].join(', '),
+  )
+
+  expect(await getPropertyValue('#e', 'box-shadow')).toEqual(
+    [
+      'rgb(255, 0, 0) 0px 1px 1px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+    ].join(', '),
+  )
+
+  await page.locator('#e').hover()
+
+  expect(await getPropertyValue('#e', 'box-shadow')).toEqual(
+    [
+      'rgba(0, 0, 0, 0.05) 0px 2px 4px 0px inset',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
+      'rgba(0, 0, 0, 0) 0px 0px 0px 0px',
     ].join(', '),
   )
 })
@@ -287,28 +494,195 @@ test('content-none persists when conditionally styling a pseudo-element', async 
   expect(await getPropertyValue(['#x', '::after'], 'content')).toEqual('none')
 })
 
+test('explicit leading utilities are respected when overriding font-size', async ({ page }) => {
+  let { getPropertyValue } = await render(
+    page,
+    html`
+      <div id="x" class="text-sm hover:text-xl">Hello world</div>
+      <div id="y" class="text-sm leading-tight hover:text-xl">Hello world</div>
+      <div id="z" class="text-sm leading-[10px] hover:text-xl">Hello world</div>
+    `,
+    css`
+      @theme {
+        --text-sm: 14px;
+        --text-sm--line-height: 16px;
+        --text-xl: 20px;
+        --text-xl--line-height: 24px;
+        --leading-tight: 8px;
+      }
+    `,
+  )
+
+  expect(await getPropertyValue('#x', 'line-height')).toEqual('16px')
+  await page.locator('#x').hover()
+  expect(await getPropertyValue('#x', 'line-height')).toEqual('24px')
+
+  expect(await getPropertyValue('#y', 'line-height')).toEqual('8px')
+  await page.locator('#y').hover()
+  expect(await getPropertyValue('#y', 'line-height')).toEqual('8px')
+
+  expect(await getPropertyValue('#z', 'line-height')).toEqual('10px')
+  await page.locator('#z').hover()
+  expect(await getPropertyValue('#z', 'line-height')).toEqual('10px')
+})
+
+test('explicit leading utilities are overridden by line-height modifiers', async ({ page }) => {
+  let { getPropertyValue } = await render(
+    page,
+    html`
+      <div id="x" class="text-sm hover:text-xl/[100px]">Hello world</div>
+      <div id="y" class="text-sm leading-tight hover:text-xl/[100px]">Hello world</div>
+      <div id="z" class="text-sm leading-[10px] hover:text-xl/[100px]">Hello world</div>
+    `,
+    css`
+      @theme {
+        --text-sm: 14px;
+        --text-sm--line-height: 16px;
+        --text-xl: 20px;
+        --text-xl--line-height: 24px;
+        --leading-tight: 8px;
+      }
+    `,
+  )
+
+  expect(await getPropertyValue('#x', 'line-height')).toEqual('16px')
+  await page.locator('#x').hover()
+  expect(await getPropertyValue('#x', 'line-height')).toEqual('100px')
+
+  expect(await getPropertyValue('#y', 'line-height')).toEqual('8px')
+  await page.locator('#y').hover()
+  expect(await getPropertyValue('#y', 'line-height')).toEqual('100px')
+
+  expect(await getPropertyValue('#z', 'line-height')).toEqual('10px')
+  await page.locator('#z').hover()
+  expect(await getPropertyValue('#z', 'line-height')).toEqual('100px')
+})
+
+test('explicit tracking utilities are respected when overriding font-size', async ({ page }) => {
+  let { getPropertyValue } = await render(
+    page,
+    html`
+      <div id="x" class="text-sm hover:text-xl">Hello world</div>
+      <div id="y" class="text-sm tracking-tight hover:text-xl">Hello world</div>
+      <div id="z" class="text-sm tracking-[3px] hover:text-xl">Hello world</div>
+    `,
+    css`
+      @theme {
+        --text-sm--letter-spacing: 5px;
+        --text-xl--letter-spacing: 10px;
+        --tracking-tight: 1px;
+      }
+    `,
+  )
+
+  expect(await getPropertyValue('#x', 'letter-spacing')).toEqual('5px')
+  await page.locator('#x').hover()
+  expect(await getPropertyValue('#x', 'letter-spacing')).toEqual('10px')
+
+  expect(await getPropertyValue('#y', 'letter-spacing')).toEqual('1px')
+  await page.locator('#y').hover()
+  expect(await getPropertyValue('#y', 'letter-spacing')).toEqual('1px')
+
+  expect(await getPropertyValue('#z', 'letter-spacing')).toEqual('3px')
+  await page.locator('#z').hover()
+  expect(await getPropertyValue('#z', 'letter-spacing')).toEqual('3px')
+})
+
+test('explicit font-weight utilities are respected when overriding font-size', async ({ page }) => {
+  let { getPropertyValue } = await render(
+    page,
+    html`
+      <div id="x" class="text-sm hover:text-xl">Hello world</div>
+      <div id="y" class="text-sm font-bold hover:text-xl">Hello world</div>
+      <div id="z" class="text-sm font-[900] hover:text-xl">Hello world</div>
+    `,
+    css`
+      @theme {
+        --text-sm--font-weight: 100;
+        --text-xl--font-weight: 200;
+      }
+    `,
+  )
+
+  expect(await getPropertyValue('#x', 'font-weight')).toEqual('100')
+  await page.locator('#x').hover()
+  expect(await getPropertyValue('#x', 'font-weight')).toEqual('200')
+
+  expect(await getPropertyValue('#y', 'font-weight')).toEqual('700')
+  await page.locator('#y').hover()
+  expect(await getPropertyValue('#y', 'font-weight')).toEqual('700')
+
+  expect(await getPropertyValue('#z', 'font-weight')).toEqual('900')
+  await page.locator('#z').hover()
+  expect(await getPropertyValue('#z', 'font-weight')).toEqual('900')
+})
+
+test('explicit duration and ease utilities are respected when overriding transition-property', async ({
+  page,
+}) => {
+  let { getPropertyValue } = await render(
+    page,
+    html`
+      <div
+        id="x"
+        class="ease-[linear] duration-500 transition-[opacity] hover:transition-[background-color]"
+      >
+        Hello world
+      </div>
+    `,
+  )
+
+  expect(await getPropertyValue('#x', 'transition-timing-function')).toEqual('linear')
+  expect(await getPropertyValue('#x', 'transition-duration')).toEqual('0.5s')
+  await page.locator('#x').hover()
+  expect(await getPropertyValue('#x', 'transition-timing-function')).toEqual('linear')
+  expect(await getPropertyValue('#x', 'transition-duration')).toEqual('0.5s')
+})
+
 // ---
 
 const preflight = fs.readFileSync(path.resolve(__dirname, '..', 'preflight.css'), 'utf-8')
 const defaultTheme = fs.readFileSync(path.resolve(__dirname, '..', 'theme.css'), 'utf-8')
-async function render(page: Page, content: string) {
+
+async function render(page: Page, content: string, extraCss: string = '') {
+  let { build } = await compile(css`
+    @layer theme, base, components, utilities;
+    @layer theme {
+      ${defaultTheme}
+
+      @theme {
+        --color-red: rgb(255, 0, 0);
+        --color-green: rgb(0, 255, 0);
+        --color-blue: rgb(0, 0, 255);
+      }
+    }
+    @layer base {
+      ${preflight}
+    }
+    @layer utilities {
+      @tailwind utilities;
+    }
+    ${extraCss}
+  `)
+
+  // We noticed that some of the tests depending on the `hover:` variant were
+  // flaky. After some investigation, we found that injected elements had the
+  // `:hover` state without us explicitly hovering over the element.
+  //
+  // To avoid this, we now set up an explicit placeholder element to move the
+  // mouse to before running the tests.
+  content = `<div id="mouse-park" class="size-12"></div>${content}`
+
   await page.setContent(content)
+
+  let scanner = new Scanner({})
+  let candidates = scanner.scanFiles([{ content, extension: 'html' }])
+
   await page.addStyleTag({
-    content: optimizeCss(
-      compile(css`
-        @layer theme, base, components, utilities;
-        @layer theme {
-          ${defaultTheme}
-        }
-        @layer base {
-          ${preflight}
-        }
-        @layer utilities {
-          @tailwind utilities;
-        }
-      `).build(scanFiles([{ content, extension: 'html' }], IO.Sequential | Parsing.Sequential)),
-    ),
+    content: optimizeCss(build(candidates)),
   })
+
+  await page.locator('#mouse-park').hover()
 
   return {
     getPropertyValue(selector: string | [string, string], property: string) {

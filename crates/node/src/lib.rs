@@ -1,89 +1,150 @@
-use napi::bindgen_prelude::{FromNapiValue, ToNapiValue};
-use std::path::PathBuf;
+use utf16::IndexConverter;
 
 #[macro_use]
 extern crate napi_derive;
 
+mod utf16;
+
 #[derive(Debug, Clone)]
 #[napi(object)]
 pub struct ChangedContent {
+  /// File path to the changed file
   pub file: Option<String>,
+
+  /// Contents of the changed file
   pub content: Option<String>,
+
+  /// File extension
   pub extension: String,
-}
-
-impl From<ChangedContent> for tailwindcss_oxide::ChangedContent {
-  fn from(changed_content: ChangedContent) -> Self {
-    tailwindcss_oxide::ChangedContent {
-      file: changed_content.file.map(PathBuf::from),
-      content: changed_content.content,
-    }
-  }
-}
-
-#[derive(Debug, Clone)]
-#[napi(object)]
-pub struct ScanResult {
-  pub globs: Vec<GlobEntry>,
-  pub files: Vec<String>,
-  pub candidates: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 #[napi(object)]
 pub struct GlobEntry {
+  /// Base path of the glob
   pub base: String,
-  pub glob: String,
+
+  /// Glob pattern
+  pub pattern: String,
+}
+
+impl From<ChangedContent> for tailwindcss_oxide::ChangedContent {
+  fn from(changed_content: ChangedContent) -> Self {
+    Self {
+      file: changed_content.file.map(Into::into),
+      content: changed_content.content,
+    }
+  }
+}
+
+impl From<GlobEntry> for tailwindcss_oxide::GlobEntry {
+  fn from(glob: GlobEntry) -> Self {
+    Self {
+      base: glob.base,
+      pattern: glob.pattern,
+    }
+  }
+}
+
+impl From<tailwindcss_oxide::GlobEntry> for GlobEntry {
+  fn from(glob: tailwindcss_oxide::GlobEntry) -> Self {
+    Self {
+      base: glob.base,
+      pattern: glob.pattern,
+    }
+  }
+}
+
+// ---
+
+#[derive(Debug, Clone)]
+#[napi(object)]
+pub struct ScannerOptions {
+  /// Glob sources
+  pub sources: Option<Vec<GlobEntry>>,
+}
+
+#[derive(Debug, Clone)]
+#[napi]
+pub struct Scanner {
+  scanner: tailwindcss_oxide::Scanner,
 }
 
 #[derive(Debug, Clone)]
 #[napi(object)]
-pub struct ScanOptions {
-  pub base: String,
-  pub globs: Option<bool>,
+pub struct CandidateWithPosition {
+  /// The candidate string
+  pub candidate: String,
+
+  /// The position of the candidate inside the content file
+  pub position: i64,
 }
 
 #[napi]
-pub fn clear_cache() {
-    tailwindcss_oxide::clear_cache();
-}
-
-#[napi]
-pub fn scan_dir(args: ScanOptions) -> ScanResult {
-  let result = tailwindcss_oxide::scan_dir(tailwindcss_oxide::ScanOptions {
-    base: args.base,
-    globs: args.globs.unwrap_or(false),
-  });
-
-  ScanResult {
-    files: result.files,
-    candidates: result.candidates,
-    globs: result
-      .globs
-      .into_iter()
-      .map(|g| GlobEntry {
-        base: g.base,
-        glob: g.glob,
-      })
-      .collect(),
+impl Scanner {
+  #[napi(constructor)]
+  pub fn new(opts: ScannerOptions) -> Self {
+    Self {
+      scanner: tailwindcss_oxide::Scanner::new(
+        opts
+          .sources
+          .map(|x| x.into_iter().map(Into::into).collect()),
+      ),
+    }
   }
-}
 
-#[derive(Debug)]
-#[napi]
-pub enum IO {
-  Sequential = 0b0001,
-  Parallel = 0b0010,
-}
+  #[napi]
+  pub fn scan(&mut self) -> Vec<String> {
+    self.scanner.scan()
+  }
 
-#[derive(Debug)]
-#[napi]
-pub enum Parsing {
-  Sequential = 0b0100,
-  Parallel = 0b1000,
-}
+  #[napi]
+  pub fn scan_files(&mut self, input: Vec<ChangedContent>) -> Vec<String> {
+    self
+      .scanner
+      .scan_content(input.into_iter().map(Into::into).collect())
+  }
 
-#[napi]
-pub fn scan_files(input: Vec<ChangedContent>, strategy: u8) -> Vec<String> {
-  tailwindcss_oxide::scan_files(input.into_iter().map(Into::into).collect(), strategy)
+  #[napi]
+  pub fn get_candidates_with_positions(
+    &mut self,
+    input: ChangedContent,
+  ) -> Vec<CandidateWithPosition> {
+    let content = input.content.unwrap_or_else(|| {
+      std::fs::read_to_string(input.file.unwrap()).expect("Failed to read file")
+    });
+
+    let input = ChangedContent {
+      file: None,
+      content: Some(content.clone()),
+      extension: input.extension,
+    };
+
+    let mut utf16_idx = IndexConverter::new(&content[..]);
+
+    self
+      .scanner
+      .get_candidates_with_positions(input.into())
+      .into_iter()
+      .map(|(candidate, position)| CandidateWithPosition {
+        candidate,
+        position: utf16_idx.get(position),
+      })
+      .collect()
+  }
+
+  #[napi(getter)]
+  pub fn files(&mut self) -> Vec<String> {
+    self.scanner.get_files()
+  }
+
+  #[napi(getter)]
+  pub fn globs(&mut self) -> Vec<GlobEntry> {
+    self
+      .scanner
+      .get_globs()
+      .into_iter()
+      .map(Into::into)
+      .collect()
+  }
 }

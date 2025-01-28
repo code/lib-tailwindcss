@@ -4,8 +4,8 @@ import { compileCss, optimizeCss, run } from './test-utils/run'
 
 const css = String.raw
 
-test('sr-only', () => {
-  expect(run(['sr-only'])).toMatchInlineSnapshot(`
+test('sr-only', async () => {
+  expect(await run(['sr-only'])).toMatchInlineSnapshot(`
     ".sr-only {
       clip: rect(0, 0, 0, 0);
       white-space: nowrap;
@@ -18,11 +18,11 @@ test('sr-only', () => {
       overflow: hidden;
     }"
   `)
-  expect(run(['-sr-only', 'sr-only-[--value]', 'sr-only/foo'])).toEqual('')
+  expect(await run(['-sr-only', 'sr-only-[var(--value)]', 'sr-only/foo'])).toEqual('')
 })
 
-test('not-sr-only', () => {
-  expect(run(['not-sr-only'])).toMatchInlineSnapshot(`
+test('not-sr-only', async () => {
+  expect(await run(['not-sr-only'])).toMatchInlineSnapshot(`
     ".not-sr-only {
       clip: auto;
       white-space: normal;
@@ -34,11 +34,11 @@ test('not-sr-only', () => {
       overflow: visible;
     }"
   `)
-  expect(run(['-not-sr-only', 'not-sr-only-[--value]', 'not-sr-only/foo'])).toEqual('')
+  expect(await run(['-not-sr-only', 'not-sr-only-[var(--value)]', 'not-sr-only/foo'])).toEqual('')
 })
 
-test('pointer-events', () => {
-  expect(run(['pointer-events-none', 'pointer-events-auto'])).toMatchInlineSnapshot(`
+test('pointer-events', async () => {
+  expect(await run(['pointer-events-none', 'pointer-events-auto'])).toMatchInlineSnapshot(`
     ".pointer-events-auto {
       pointer-events: auto;
     }
@@ -48,17 +48,17 @@ test('pointer-events', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-pointer-events-none',
       '-pointer-events-auto',
-      'pointer-events-[--value]',
+      'pointer-events-[var(--value)]',
       'pointer-events-none/foo',
     ]),
   ).toEqual('')
 })
 
-test('visibility', () => {
-  expect(run(['visible', 'invisible', 'collapse'])).toMatchInlineSnapshot(`
+test('visibility', async () => {
+  expect(await run(['visible', 'invisible', 'collapse'])).toMatchInlineSnapshot(`
     ".collapse {
       visibility: collapse;
     }
@@ -72,12 +72,19 @@ test('visibility', () => {
     }"
   `)
   expect(
-    run(['-visible', '-invisible', '-collapse', 'visible/foo', 'invisible/foo', 'collapse/foo']),
+    await run([
+      '-visible',
+      '-invisible',
+      '-collapse',
+      'visible/foo',
+      'invisible/foo',
+      'collapse/foo',
+    ]),
   ).toEqual('')
 })
 
-test('position', () => {
-  expect(run(['static', 'fixed', 'absolute', 'relative', 'sticky'])).toMatchInlineSnapshot(`
+test('position', async () => {
+  expect(await run(['static', 'fixed', 'absolute', 'relative', 'sticky'])).toMatchInlineSnapshot(`
     ".absolute {
       position: absolute;
     }
@@ -99,7 +106,7 @@ test('position', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-static',
       '-fixed',
       '-absolute',
@@ -114,17 +121,21 @@ test('position', () => {
   ).toEqual('')
 })
 
-test('inset', () => {
+test('inset', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
+          --inset-shadowned: 1940px;
         }
         @tailwind utilities;
       `,
       [
         'inset-auto',
+        'inset-shadow-sm',
+        'inset-shadowned',
         '-inset-full',
         'inset-full',
         'inset-3/4',
@@ -136,10 +147,12 @@ test('inset', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadow-sm: inset 0 1px 1px #0000000d;
+      --inset-shadowned: 1940px;
     }
 
     .-inset-4 {
-      inset: calc(var(--spacing-4, 1rem) * -1);
+      inset: calc(var(--spacing-4) * -1);
     }
 
     .-inset-full {
@@ -151,7 +164,7 @@ test('inset', () => {
     }
 
     .inset-4 {
-      inset: var(--spacing-4, 1rem);
+      inset: var(--spacing-4);
     }
 
     .inset-\\[4px\\] {
@@ -164,11 +177,91 @@ test('inset', () => {
 
     .inset-full {
       inset: 100%;
+    }
+
+    .inset-shadowned {
+      inset: var(--inset-shadowned);
+    }
+
+    .inset-shadow-sm {
+      --tw-inset-shadow: inset 0 1px 1px var(--tw-inset-shadow-color, #0000000d);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+
+    @property --tw-shadow {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0 0 #0000;
+    }
+
+    @property --tw-shadow-color {
+      syntax: "*";
+      inherits: false
+    }
+
+    @property --tw-inset-shadow {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0 0 #0000;
+    }
+
+    @property --tw-inset-shadow-color {
+      syntax: "*";
+      inherits: false
+    }
+
+    @property --tw-ring-color {
+      syntax: "*";
+      inherits: false
+    }
+
+    @property --tw-ring-shadow {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0 0 #0000;
+    }
+
+    @property --tw-inset-ring-color {
+      syntax: "*";
+      inherits: false
+    }
+
+    @property --tw-inset-ring-shadow {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0 0 #0000;
+    }
+
+    @property --tw-ring-inset {
+      syntax: "*";
+      inherits: false
+    }
+
+    @property --tw-ring-offset-width {
+      syntax: "<length>";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-ring-offset-color {
+      syntax: "*";
+      inherits: false;
+      initial-value: #fff;
+    }
+
+    @property --tw-ring-offset-shadow {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0 0 #0000;
     }"
   `)
   expect(
-    run([
+    await run([
       'inset',
+      'inset--1',
+      'inset--1/2',
+      'inset--1/-2',
+      'inset-1/-2',
       'inset-auto/foo',
       '-inset-full/foo',
       'inset-full/foo',
@@ -180,16 +273,18 @@ test('inset', () => {
   ).toEqual('')
 })
 
-test('inset-x', () => {
+test('inset-x', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
         }
         @tailwind utilities;
       `,
       [
+        'inset-x-shadowned',
         'inset-x-auto',
         'inset-x-full',
         '-inset-x-full',
@@ -202,67 +297,81 @@ test('inset-x', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-inset-x-4 {
-      right: calc(var(--spacing-4, 1rem) * -1);
-      left: calc(var(--spacing-4, 1rem) * -1);
+      inset-inline: calc(var(--spacing-4) * -1);
     }
 
     .-inset-x-full {
-      left: -100%;
-      right: -100%;
+      inset-inline: -100%;
     }
 
     .inset-x-3\\/4 {
-      left: 75%;
-      right: 75%;
+      inset-inline: 75%;
     }
 
     .inset-x-4 {
-      right: var(--spacing-4, 1rem);
-      left: var(--spacing-4, 1rem);
+      inset-inline: var(--spacing-4);
     }
 
     .inset-x-\\[4px\\] {
-      left: 4px;
-      right: 4px;
+      inset-inline: 4px;
     }
 
     .inset-x-auto {
-      left: auto;
-      right: auto;
+      inset-inline: auto;
     }
 
     .inset-x-full {
-      left: 100%;
-      right: 100%;
+      inset-inline: 100%;
+    }
+
+    .inset-x-shadowned {
+      inset-inline: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'inset-x',
-      'inset-x-auto/foo',
-      'inset-x-full/foo',
-      '-inset-x-full/foo',
-      'inset-x-3/4/foo',
-      'inset-x-4/foo',
-      '-inset-x-4/foo',
-      'inset-x-[4px]/foo',
-    ]),
-  ).toEqual('')
-})
-
-test('inset-y', () => {
-  expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px #0000000d;
         }
         @tailwind utilities;
       `,
       [
+        'inset-x-shadow-sm',
+        'inset-x',
+        'inset-x--1',
+        'inset-x--1/2',
+        'inset-x--1/-2',
+        'inset-x-1/-2',
+        'inset-x-auto/foo',
+        'inset-x-full/foo',
+        '-inset-x-full/foo',
+        'inset-x-3/4/foo',
+        'inset-x-4/foo',
+        '-inset-x-4/foo',
+        'inset-x-[4px]/foo',
+      ],
+    ),
+  ).toEqual('')
+})
+
+test('inset-y', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'inset-y-shadowned',
         'inset-y-auto',
         'inset-y-full',
         '-inset-y-full',
@@ -275,67 +384,81 @@ test('inset-y', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-inset-y-4 {
-      top: calc(var(--spacing-4, 1rem) * -1);
-      bottom: calc(var(--spacing-4, 1rem) * -1);
+      inset-block: calc(var(--spacing-4) * -1);
     }
 
     .-inset-y-full {
-      top: -100%;
-      bottom: -100%;
+      inset-block: -100%;
     }
 
     .inset-y-3\\/4 {
-      top: 75%;
-      bottom: 75%;
+      inset-block: 75%;
     }
 
     .inset-y-4 {
-      top: var(--spacing-4, 1rem);
-      bottom: var(--spacing-4, 1rem);
+      inset-block: var(--spacing-4);
     }
 
     .inset-y-\\[4px\\] {
-      top: 4px;
-      bottom: 4px;
+      inset-block: 4px;
     }
 
     .inset-y-auto {
-      top: auto;
-      bottom: auto;
+      inset-block: auto;
     }
 
     .inset-y-full {
-      top: 100%;
-      bottom: 100%;
+      inset-block: 100%;
+    }
+
+    .inset-y-shadowned {
+      inset-block: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'inset-y',
-      'inset-y-auto/foo',
-      'inset-y-full/foo',
-      '-inset-y-full/foo',
-      'inset-y-3/4/foo',
-      'inset-y-4/foo',
-      '-inset-y-4/foo',
-      'inset-y-[4px]/foo',
-    ]),
-  ).toEqual('')
-})
-
-test('start', () => {
-  expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
         }
         @tailwind utilities;
       `,
       [
+        'inset-y-shadow-sm',
+        'inset-y',
+        'inset-y--1',
+        'inset-y--1/2',
+        'inset-y--1/-2',
+        'inset-1/-2',
+        'inset-y-auto/foo',
+        'inset-y-full/foo',
+        '-inset-y-full/foo',
+        'inset-y-3/4/foo',
+        'inset-y-4/foo',
+        '-inset-y-4/foo',
+        'inset-y-[4px]/foo',
+      ],
+    ),
+  ).toEqual('')
+})
+
+test('start', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'start-shadowned',
         'start-auto',
         '-start-full',
         'start-full',
@@ -348,10 +471,11 @@ test('start', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-start-4 {
-      inset-inline-start: calc(var(--spacing-4, 1rem) * -1);
+      inset-inline-start: calc(var(--spacing-4) * -1);
     }
 
     .-start-full {
@@ -363,7 +487,7 @@ test('start', () => {
     }
 
     .start-4 {
-      inset-inline-start: var(--spacing-4, 1rem);
+      inset-inline-start: var(--spacing-4);
     }
 
     .start-\\[4px\\] {
@@ -376,40 +500,69 @@ test('start', () => {
 
     .start-full {
       inset-inline-start: 100%;
+    }
+
+    .start-shadowned {
+      inset-inline-start: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'start',
-      'start-auto/foo',
-      '-start-full/foo',
-      'start-full/foo',
-      'start-3/4/foo',
-      'start-4/foo',
-      '-start-4/foo',
-      'start-[4px]/foo',
-    ]),
-  ).toEqual('')
-})
-
-test('end', () => {
-  expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
         }
         @tailwind utilities;
       `,
-      ['end-auto', '-end-full', 'end-full', 'end-3/4', 'end-4', '-end-4', 'end-[4px]'],
+      [
+        'start-shadow-sm',
+        'start',
+        'start--1',
+        'start--1/2',
+        'start--1/-2',
+        'start-1/-2',
+        'start-auto/foo',
+        '-start-full/foo',
+        'start-full/foo',
+        'start-3/4/foo',
+        'start-4/foo',
+        '-start-4/foo',
+        'start-[4px]/foo',
+      ],
+    ),
+  ).toEqual('')
+})
+
+test('end', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'end-shadowned',
+        'end-auto',
+        '-end-full',
+        'end-full',
+        'end-3/4',
+        'end-4',
+        '-end-4',
+        'end-[4px]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-end-4 {
-      inset-inline-end: calc(var(--spacing-4, 1rem) * -1);
+      inset-inline-end: calc(var(--spacing-4) * -1);
     }
 
     .-end-full {
@@ -421,7 +574,7 @@ test('end', () => {
     }
 
     .end-4 {
-      inset-inline-end: var(--spacing-4, 1rem);
+      inset-inline-end: var(--spacing-4);
     }
 
     .end-\\[4px\\] {
@@ -434,41 +587,70 @@ test('end', () => {
 
     .end-full {
       inset-inline-end: 100%;
+    }
+
+    .end-shadowned {
+      inset-inline-end: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'end',
-      'end-auto/foo',
-      '-end-full/foo',
-      'end-full/foo',
-      'end-3/4/foo',
-      'end-4/foo',
-      '-end-4/foo',
-      'end-[4px]/foo',
-    ]),
+    await compileCss(
+      css`
+        @theme reference {
+          --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
+        }
+        @tailwind utilities;
+      `,
+      [
+        'end-shadow-sm',
+        'end',
+        'end--1',
+        'end--1/2',
+        'end--1/-2',
+        'end-1/-2',
+        'end-auto/foo',
+        '-end-full/foo',
+        'end-full/foo',
+        'end-3/4/foo',
+        'end-4/foo',
+        '-end-4/foo',
+        'end-[4px]/foo',
+      ],
+    ),
   ).toEqual('')
 })
 
-test('top', () => {
+test('top', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
         }
         @tailwind utilities;
       `,
 
-      ['top-auto', '-top-full', 'top-full', 'top-3/4', 'top-4', '-top-4', 'top-[4px]'],
+      [
+        'top-shadowned',
+        'top-auto',
+        '-top-full',
+        'top-full',
+        'top-3/4',
+        'top-4',
+        '-top-4',
+        'top-[4px]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-top-4 {
-      top: calc(var(--spacing-4, 1rem) * -1);
+      top: calc(var(--spacing-4) * -1);
     }
 
     .-top-full {
@@ -480,7 +662,7 @@ test('top', () => {
     }
 
     .top-4 {
-      top: var(--spacing-4, 1rem);
+      top: var(--spacing-4);
     }
 
     .top-\\[4px\\] {
@@ -493,32 +675,52 @@ test('top', () => {
 
     .top-full {
       top: 100%;
+    }
+
+    .top-shadowned {
+      top: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'top',
-      'top-auto/foo',
-      '-top-full/foo',
-      'top-full/foo',
-      'top-3/4/foo',
-      'top-4/foo',
-      '-top-4/foo',
-      'top-[4px]/foo',
-    ]),
-  ).toEqual('')
-})
-
-test('right', () => {
-  expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
         }
         @tailwind utilities;
       `,
       [
+        'top-shadow-sm',
+        'top',
+        'top--1',
+        'top--1/2',
+        'top--1/-2',
+        'top-1/-2',
+        'top-auto/foo',
+        '-top-full/foo',
+        'top-full/foo',
+        'top-3/4/foo',
+        'top-4/foo',
+        '-top-4/foo',
+        'top-[4px]/foo',
+      ],
+    ),
+  ).toEqual('')
+})
+
+test('right', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'right-shadowned',
         'right-auto',
         '-right-full',
         'right-full',
@@ -531,10 +733,11 @@ test('right', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-right-4 {
-      right: calc(var(--spacing-4, 1rem) * -1);
+      right: calc(var(--spacing-4) * -1);
     }
 
     .-right-full {
@@ -546,7 +749,7 @@ test('right', () => {
     }
 
     .right-4 {
-      right: var(--spacing-4, 1rem);
+      right: var(--spacing-4);
     }
 
     .right-\\[4px\\] {
@@ -559,32 +762,52 @@ test('right', () => {
 
     .right-full {
       right: 100%;
+    }
+
+    .right-shadowned {
+      right: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'right',
-      'right-auto/foo',
-      '-right-full/foo',
-      'right-full/foo',
-      'right-3/4/foo',
-      'right-4/foo',
-      '-right-4/foo',
-      'right-[4px]/foo',
-    ]),
-  ).toEqual('')
-})
-
-test('bottom', () => {
-  expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
         }
         @tailwind utilities;
       `,
       [
+        'right-shadow-sm',
+        'right',
+        'right--1',
+        'right--1/2',
+        'right--1/-2',
+        'right-1/-2',
+        'right-auto/foo',
+        '-right-full/foo',
+        'right-full/foo',
+        'right-3/4/foo',
+        'right-4/foo',
+        '-right-4/foo',
+        'right-[4px]/foo',
+      ],
+    ),
+  ).toEqual('')
+})
+
+test('bottom', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'bottom-shadowned',
         'bottom-auto',
         '-bottom-full',
         'bottom-full',
@@ -597,10 +820,11 @@ test('bottom', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-bottom-4 {
-      bottom: calc(var(--spacing-4, 1rem) * -1);
+      bottom: calc(var(--spacing-4) * -1);
     }
 
     .-bottom-full {
@@ -612,7 +836,7 @@ test('bottom', () => {
     }
 
     .bottom-4 {
-      bottom: var(--spacing-4, 1rem);
+      bottom: var(--spacing-4);
     }
 
     .bottom-\\[4px\\] {
@@ -625,40 +849,69 @@ test('bottom', () => {
 
     .bottom-full {
       bottom: 100%;
+    }
+
+    .bottom-shadowned {
+      bottom: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'bottom',
-      'bottom-auto/foo',
-      '-bottom-full/foo',
-      'bottom-full/foo',
-      'bottom-3/4/foo',
-      'bottom-4/foo',
-      '-bottom-4/foo',
-      'bottom-[4px]/foo',
-    ]),
-  ).toEqual('')
-})
-
-test('left', () => {
-  expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
         }
         @tailwind utilities;
       `,
-      ['left-auto', '-left-full', 'left-full', 'left-3/4', 'left-4', '-left-4', 'left-[4px]'],
+      [
+        'bottom-shadow-sm',
+        'bottom',
+        'bottom--1',
+        'bottom--1/2',
+        'bottom--1/-2',
+        'bottom-1/-2',
+        'bottom-auto/foo',
+        '-bottom-full/foo',
+        'bottom-full/foo',
+        'bottom-3/4/foo',
+        'bottom-4/foo',
+        '-bottom-4/foo',
+        'bottom-[4px]/foo',
+      ],
+    ),
+  ).toEqual('')
+})
+
+test('left', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing-4: 1rem;
+          --inset-shadowned: 1940px;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'left-shadowned',
+        'left-auto',
+        '-left-full',
+        'left-full',
+        'left-3/4',
+        'left-4',
+        '-left-4',
+        'left-[4px]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
+      --inset-shadowned: 1940px;
     }
 
     .-left-4 {
-      left: calc(var(--spacing-4, 1rem) * -1);
+      left: calc(var(--spacing-4) * -1);
     }
 
     .-left-full {
@@ -670,7 +923,7 @@ test('left', () => {
     }
 
     .left-4 {
-      left: var(--spacing-4, 1rem);
+      left: var(--spacing-4);
     }
 
     .left-\\[4px\\] {
@@ -683,24 +936,42 @@ test('left', () => {
 
     .left-full {
       left: 100%;
+    }
+
+    .left-shadowned {
+      left: var(--inset-shadowned);
     }"
   `)
   expect(
-    run([
-      'left',
-      'left-auto/foo',
-      '-left-full/foo',
-      'left-full/foo',
-      'left-3/4/foo',
-      'left-4/foo',
-      '-left-4/foo',
-      'left-[4px]/foo',
-    ]),
+    await compileCss(
+      css`
+        @theme reference {
+          --spacing-4: 1rem;
+          --inset-shadow-sm: inset 0 1px 1px rgb(0 0 0 / 0.05);
+        }
+        @tailwind utilities;
+      `,
+      [
+        'left-shadow-sm',
+        'left',
+        'left--1',
+        'left--1/2',
+        'left--1/-2',
+        'left-1/-2',
+        'left-auto/foo',
+        '-left-full/foo',
+        'left-full/foo',
+        'left-3/4/foo',
+        'left-4/foo',
+        '-left-4/foo',
+        'left-[4px]/foo',
+      ],
+    ),
   ).toEqual('')
 })
 
-test('isolation', () => {
-  expect(run(['isolate', 'isolation-auto'])).toMatchInlineSnapshot(`
+test('isolation', async () => {
+  expect(await run(['isolate', 'isolation-auto'])).toMatchInlineSnapshot(`
     ".isolate {
       isolation: isolate;
     }
@@ -709,34 +980,38 @@ test('isolation', () => {
       isolation: auto;
     }"
   `)
-  expect(run(['-isolate', '-isolation-auto', 'isolate/foo', 'isolation-auto/foo'])).toEqual('')
+  expect(await run(['-isolate', '-isolation-auto', 'isolate/foo', 'isolation-auto/foo'])).toEqual(
+    '',
+  )
 })
 
-test('z-index', () => {
-  expect(run(['z-auto', 'z-10', '-z-10', 'z-[123]', '-z-[--value]'])).toMatchInlineSnapshot(`
-    ".-z-10 {
-      z-index: calc(10 * -1);
-    }
+test('z-index', async () => {
+  expect(await run(['z-auto', 'z-10', '-z-10', 'z-[123]', '-z-[var(--value)]']))
+    .toMatchInlineSnapshot(`
+      ".-z-10 {
+        z-index: calc(10 * -1);
+      }
 
-    .-z-\\[--value\\] {
-      z-index: calc(var(--value) * -1);
-    }
+      .-z-\\[var\\(--value\\)\\] {
+        z-index: calc(var(--value) * -1);
+      }
 
-    .z-10 {
-      z-index: 10;
-    }
+      .z-10 {
+        z-index: 10;
+      }
 
-    .z-\\[123\\] {
-      z-index: 123;
-    }
+      .z-\\[123\\] {
+        z-index: 123;
+      }
 
-    .z-auto {
-      z-index: auto;
-    }"
-  `)
+      .z-auto {
+        z-index: auto;
+      }"
+    `)
   expect(
-    run([
+    await run([
       'z',
+      'z--1',
       '-z-auto',
       'z-unknown',
       'z-123.5',
@@ -744,18 +1019,18 @@ test('z-index', () => {
       'z-10/foo',
       '-z-10/foo',
       'z-[123]/foo',
-      '-z-[--value]/foo',
+      '-z-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('order', () => {
+test('order', async () => {
   expect(
-    run([
+    await run([
       'order-4',
       '-order-4',
       'order-[123]',
-      '-order-[--value]',
+      '-order-[var(--value)]',
       'order-first',
       'order-last',
       'order-none',
@@ -765,7 +1040,7 @@ test('order', () => {
       order: calc(4 * -1);
     }
 
-    .-order-\\[--value\\] {
+    .-order-\\[var\\(--value\\)\\] {
       order: calc(var(--value) * -1);
     }
 
@@ -790,8 +1065,9 @@ test('order', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'order',
+      'order--4',
       '-order-first',
       '-order-last',
       '-order-none',
@@ -800,7 +1076,7 @@ test('order', () => {
       'order-4/foo',
       '-order-4/foo',
       'order-[123]/foo',
-      '-order-[--value]/foo',
+      '-order-[var(--value)]/foo',
       'order-first/foo',
       'order-last/foo',
       'order-none/foo',
@@ -808,15 +1084,15 @@ test('order', () => {
   ).toEqual('')
 })
 
-test('col', () => {
+test('col', async () => {
   expect(
-    run([
+    await run([
       'col-auto',
       'col-span-4',
       'col-span-17',
       'col-span-full',
       'col-[span_123/span_123]',
-      'col-span-[--my-variable]',
+      'col-span-[var(--my-variable)]',
     ]),
   ).toMatchInlineSnapshot(`
     ".col-\\[span_123\\/span_123\\] {
@@ -835,7 +1111,7 @@ test('col', () => {
       grid-column: span 17 / span 17;
     }
 
-    .col-span-\\[--my-variable\\] {
+    .col-span-\\[var\\(--my-variable\\)\\] {
       grid-column: span var(--my-variable) / span var(--my-variable);
     }
 
@@ -844,9 +1120,10 @@ test('col', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'col',
       'col-span',
+      'col-span--1',
       '-col-span-4',
       'col-span-unknown',
       'col-auto/foo',
@@ -854,37 +1131,39 @@ test('col', () => {
       'col-span-17/foo',
       'col-span-full/foo',
       'col-[span_123/span_123]/foo',
-      'col-span-[--my-variable]/foo',
+      'col-span-[var(--my-variable)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('col-start', () => {
-  expect(run(['col-start-auto', 'col-start-4', 'col-start-99', 'col-start-[123]', '-col-start-4']))
-    .toMatchInlineSnapshot(`
-      ".-col-start-4 {
-        grid-column-start: calc(4 * -1);
-      }
-
-      .col-start-4 {
-        grid-column-start: 4;
-      }
-
-      .col-start-99 {
-        grid-column-start: 99;
-      }
-
-      .col-start-\\[123\\] {
-        grid-column-start: 123;
-      }
-
-      .col-start-auto {
-        grid-column-start: auto;
-      }"
-    `)
+test('col-start', async () => {
   expect(
-    run([
+    await run(['col-start-auto', 'col-start-4', 'col-start-99', 'col-start-[123]', '-col-start-4']),
+  ).toMatchInlineSnapshot(`
+    ".-col-start-4 {
+      grid-column-start: calc(4 * -1);
+    }
+
+    .col-start-4 {
+      grid-column-start: 4;
+    }
+
+    .col-start-99 {
+      grid-column-start: 99;
+    }
+
+    .col-start-\\[123\\] {
+      grid-column-start: 123;
+    }
+
+    .col-start-auto {
+      grid-column-start: auto;
+    }"
+  `)
+  expect(
+    await run([
       'col-start',
+      'col-start--1',
       'col-start-unknown',
       'col-start-auto/foo',
       'col-start-4/foo',
@@ -895,8 +1174,8 @@ test('col-start', () => {
   ).toEqual('')
 })
 
-test('col-end', () => {
-  expect(run(['col-end-auto', 'col-end-4', 'col-end-99', 'col-end-[123]', '-col-end-4']))
+test('col-end', async () => {
+  expect(await run(['col-end-auto', 'col-end-4', 'col-end-99', 'col-end-[123]', '-col-end-4']))
     .toMatchInlineSnapshot(`
       ".-col-end-4 {
         grid-column-end: calc(4 * -1);
@@ -919,8 +1198,9 @@ test('col-end', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       'col-end',
+      'col-end--1',
       'col-end-unknown',
       'col-end-auto/foo',
       'col-end-4/foo',
@@ -931,15 +1211,15 @@ test('col-end', () => {
   ).toEqual('')
 })
 
-test('row', () => {
+test('row', async () => {
   expect(
-    run([
+    await run([
       'row-auto',
       'row-span-4',
       'row-span-17',
       'row-span-full',
       'row-[span_123/span_123]',
-      'row-span-[--my-variable]',
+      'row-span-[var(--my-variable)]',
     ]),
   ).toMatchInlineSnapshot(`
     ".row-\\[span_123\\/span_123\\] {
@@ -958,7 +1238,7 @@ test('row', () => {
       grid-row: span 17 / span 17;
     }
 
-    .row-span-\\[--my-variable\\] {
+    .row-span-\\[var\\(--my-variable\\)\\] {
       grid-row: span var(--my-variable) / span var(--my-variable);
     }
 
@@ -967,9 +1247,10 @@ test('row', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'row',
       'row-span',
+      'row-span--1',
       '-row-span-4',
       'row-span-unknown',
       'row-auto/foo',
@@ -977,14 +1258,15 @@ test('row', () => {
       'row-span-17/foo',
       'row-span-full/foo',
       'row-[span_123/span_123]/foo',
-      'row-span-[--my-variable]/foo',
+      'row-span-[var(--my-variable)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('row-start', () => {
-  expect(run(['row-start-auto', 'row-start-4', 'row-start-99', 'row-start-[123]', '-row-start-4']))
-    .toMatchInlineSnapshot(`
+test('row-start', async () => {
+  expect(
+    await run(['row-start-auto', 'row-start-4', 'row-start-99', 'row-start-[123]', '-row-start-4']),
+  ).toMatchInlineSnapshot(`
       ".-row-start-4 {
         grid-row-start: calc(4 * -1);
       }
@@ -1006,8 +1288,9 @@ test('row-start', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       'row-start',
+      'row-start--1',
       'row-start-unknown',
       'row-start-auto/foo',
       'row-start-4/foo',
@@ -1018,8 +1301,8 @@ test('row-start', () => {
   ).toEqual('')
 })
 
-test('row-end', () => {
-  expect(run(['row-end-auto', 'row-end-4', 'row-end-99', 'row-end-[123]', '-row-end-4']))
+test('row-end', async () => {
+  expect(await run(['row-end-auto', 'row-end-4', 'row-end-99', 'row-end-[123]', '-row-end-4']))
     .toMatchInlineSnapshot(`
       ".-row-end-4 {
         grid-row-end: calc(4 * -1);
@@ -1042,8 +1325,9 @@ test('row-end', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       'row-end',
+      'row-end--1',
       'row-end-unknown',
       'row-end-auto/foo',
       'row-end-4/foo',
@@ -1054,31 +1338,31 @@ test('row-end', () => {
   ).toEqual('')
 })
 
-test('float', () => {
-  expect(run(['float-start', 'float-end', 'float-right', 'float-left', 'float-none']))
+test('float', async () => {
+  expect(await run(['float-start', 'float-end', 'float-right', 'float-left', 'float-none']))
     .toMatchInlineSnapshot(`
-    ".float-end {
-      float: end;
-    }
+      ".float-end {
+        float: inline-end;
+      }
 
-    .float-left {
-      float: left;
-    }
+      .float-left {
+        float: left;
+      }
 
-    .float-none {
-      float: none;
-    }
+      .float-none {
+        float: none;
+      }
 
-    .float-right {
-      float: right;
-    }
+      .float-right {
+        float: right;
+      }
 
-    .float-start {
-      float: start;
-    }"
-  `)
+      .float-start {
+        float: inline-start;
+      }"
+    `)
   expect(
-    run([
+    await run([
       'float',
       '-float-start',
       '-float-end',
@@ -1094,15 +1378,23 @@ test('float', () => {
   ).toEqual('')
 })
 
-test('clear', () => {
-  expect(run(['clear-start', 'clear-end', 'clear-right', 'clear-left', 'clear-both', 'clear-none']))
-    .toMatchInlineSnapshot(`
+test('clear', async () => {
+  expect(
+    await run([
+      'clear-start',
+      'clear-end',
+      'clear-right',
+      'clear-left',
+      'clear-both',
+      'clear-none',
+    ]),
+  ).toMatchInlineSnapshot(`
     ".clear-both {
       clear: both;
     }
 
     .clear-end {
-      clear: end;
+      clear: inline-end;
     }
 
     .clear-left {
@@ -1118,11 +1410,11 @@ test('clear', () => {
     }
 
     .clear-start {
-      clear: start;
+      clear: inline-start;
     }"
   `)
   expect(
-    run([
+    await run([
       'clear',
       '-clear-start',
       '-clear-end',
@@ -1140,16 +1432,16 @@ test('clear', () => {
   ).toEqual('')
 })
 
-test('margin', () => {
+test('margin', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['m-auto', 'm-4', 'm-[4px]', '-m-4', '-m-[--value]'],
+      ['m-auto', 'm-4', 'm-[4px]', '-m-4', '-m-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -1157,15 +1449,15 @@ test('margin', () => {
     }
 
     .-m-4 {
-      margin: calc(var(--spacing-4, 1rem) * -1);
+      margin: calc(var(--spacing-4) * -1);
     }
 
-    .-m-\\[--value\\] {
+    .-m-\\[var\\(--value\\)\\] {
       margin: calc(var(--value) * -1);
     }
 
     .m-4 {
-      margin: var(--spacing-4, 1rem);
+      margin: var(--spacing-4);
     }
 
     .m-\\[4px\\] {
@@ -1177,351 +1469,701 @@ test('margin', () => {
     }"
   `)
   expect(
-    run(['m', 'm-auto/foo', 'm-4/foo', 'm-[4px]/foo', '-m-4/foo', '-m-[--value]/foo']),
+    await run(['m', 'm-auto/foo', 'm-4/foo', 'm-[4px]/foo', '-m-4/foo', '-m-[var(--value)]/foo']),
   ).toEqual('')
 })
 
-test('margin-x', () => {
+test('mx', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['mx-auto', 'mx-4', 'mx-[4px]', '-mx-4', '-mx-[--value]'],
+      [
+        'mx-auto',
+        'mx-1',
+        'mx-4',
+        'mx-99',
+        'mx-big',
+        'mx-[4px]',
+        '-mx-4',
+        '-mx-big',
+        '-mx-[4px]',
+        'mx-[var(--my-var)]',
+        '-mx-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
     }
 
     .-mx-4 {
-      margin-left: calc(var(--spacing-4, 1rem) * -1);
-      margin-right: calc(var(--spacing-4, 1rem) * -1);
+      margin-inline: calc(var(--spacing) * -4);
     }
 
-    .-mx-\\[--value\\] {
-      margin-left: calc(var(--value) * -1);
-      margin-right: calc(var(--value) * -1);
+    .-mx-\\[4px\\] {
+      margin-inline: -4px;
+    }
+
+    .-mx-\\[var\\(--my-var\\)\\] {
+      margin-inline: calc(var(--my-var) * -1);
+    }
+
+    .-mx-big {
+      margin-inline: calc(var(--spacing-big) * -1);
+    }
+
+    .mx-1 {
+      margin-inline: calc(var(--spacing) * 1);
     }
 
     .mx-4 {
-      margin-left: var(--spacing-4, 1rem);
-      margin-right: var(--spacing-4, 1rem);
+      margin-inline: calc(var(--spacing) * 4);
+    }
+
+    .mx-99 {
+      margin-inline: calc(var(--spacing) * 99);
     }
 
     .mx-\\[4px\\] {
-      margin-left: 4px;
-      margin-right: 4px;
+      margin-inline: 4px;
+    }
+
+    .mx-\\[var\\(--my-var\\)\\] {
+      margin-inline: var(--my-var);
     }
 
     .mx-auto {
-      margin-left: auto;
-      margin-right: auto;
+      margin-inline: auto;
+    }
+
+    .mx-big {
+      margin-inline: var(--spacing-big);
     }"
   `)
   expect(
-    run(['mx', 'mx-auto/foo', 'mx-4/foo', 'mx-[4px]/foo', '-mx-4/foo', '-mx-[--value]/foo']),
+    await run([
+      'mx',
+      'mx-auto/foo',
+      'mx-4/foo',
+      'mx-[4px]/foo',
+      '-mx-4/foo',
+      '-mx-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-y', () => {
+test('my', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['my-auto', 'my-4', 'my-[4px]', '-my-4', '-my-[--value]'],
+      [
+        'my-1',
+        'my-99',
+        'my-2.5',
+        'my-big',
+        'my-[4px]',
+        '-my-4',
+        '-my-2.5',
+        '-my-big',
+        '-my-[4px]',
+        'my-[var(--my-var)]',
+        '-my-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-my-2\\.5 {
+      margin-block: calc(var(--spacing) * -2.5);
     }
 
     .-my-4 {
-      margin-top: calc(var(--spacing-4, 1rem) * -1);
-      margin-bottom: calc(var(--spacing-4, 1rem) * -1);
+      margin-block: calc(var(--spacing) * -4);
     }
 
-    .-my-\\[--value\\] {
-      margin-top: calc(var(--value) * -1);
-      margin-bottom: calc(var(--value) * -1);
+    .-my-\\[4px\\] {
+      margin-block: -4px;
     }
 
-    .my-4 {
-      margin-top: var(--spacing-4, 1rem);
-      margin-bottom: var(--spacing-4, 1rem);
+    .-my-\\[var\\(--my-var\\)\\] {
+      margin-block: calc(var(--my-var) * -1);
+    }
+
+    .-my-big {
+      margin-block: calc(var(--spacing-big) * -1);
+    }
+
+    .my-1 {
+      margin-block: calc(var(--spacing) * 1);
+    }
+
+    .my-2\\.5 {
+      margin-block: calc(var(--spacing) * 2.5);
+    }
+
+    .my-99 {
+      margin-block: calc(var(--spacing) * 99);
     }
 
     .my-\\[4px\\] {
-      margin-top: 4px;
-      margin-bottom: 4px;
+      margin-block: 4px;
     }
 
-    .my-auto {
-      margin-top: auto;
-      margin-bottom: auto;
+    .my-\\[var\\(--my-var\\)\\] {
+      margin-block: var(--my-var);
+    }
+
+    .my-big {
+      margin-block: var(--spacing-big);
     }"
   `)
   expect(
-    run(['my', 'my-auto/foo', 'my-4/foo', 'my-[4px]/foo', '-my-4/foo', '-my-[--value]/foo']),
+    await run([
+      'my',
+      'my-auto/foo',
+      'my-4/foo',
+      'my-[4px]/foo',
+      '-my-4/foo',
+      '-my-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-top', () => {
+test('mt', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['mt-auto', 'mt-4', 'mt-[4px]', '-mt-4', '-mt-[--value]'],
+      [
+        'mt-1',
+        'mt-99',
+        'mt-2.5',
+        'mt-big',
+        'mt-[4px]',
+        '-mt-4',
+        '-mt-2.5',
+        '-mt-big',
+        '-mt-[4px]',
+        'mt-[var(--my-var)]',
+        '-mt-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-mt-2\\.5 {
+      margin-top: calc(var(--spacing) * -2.5);
     }
 
     .-mt-4 {
-      margin-top: calc(var(--spacing-4, 1rem) * -1);
+      margin-top: calc(var(--spacing) * -4);
     }
 
-    .-mt-\\[--value\\] {
-      margin-top: calc(var(--value) * -1);
+    .-mt-\\[4px\\] {
+      margin-top: -4px;
     }
 
-    .mt-4 {
-      margin-top: var(--spacing-4, 1rem);
+    .-mt-\\[var\\(--my-var\\)\\] {
+      margin-top: calc(var(--my-var) * -1);
+    }
+
+    .-mt-big {
+      margin-top: calc(var(--spacing-big) * -1);
+    }
+
+    .mt-1 {
+      margin-top: calc(var(--spacing) * 1);
+    }
+
+    .mt-2\\.5 {
+      margin-top: calc(var(--spacing) * 2.5);
+    }
+
+    .mt-99 {
+      margin-top: calc(var(--spacing) * 99);
     }
 
     .mt-\\[4px\\] {
       margin-top: 4px;
     }
 
-    .mt-auto {
-      margin-top: auto;
+    .mt-\\[var\\(--my-var\\)\\] {
+      margin-top: var(--my-var);
+    }
+
+    .mt-big {
+      margin-top: var(--spacing-big);
     }"
   `)
   expect(
-    run(['mt', 'mt-auto/foo', 'mt-4/foo', 'mt-[4px]/foo', '-mt-4/foo', '-mt-[--value]/foo']),
+    await run([
+      'mt',
+      'mt-auto/foo',
+      'mt-4/foo',
+      'mt-[4px]/foo',
+      '-mt-4/foo',
+      '-mt-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-inline-start', () => {
+test('ms', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['ms-auto', 'ms-4', 'ms-[4px]', '-ms-4', '-ms-[--value]'],
+      [
+        'ms-1',
+        'ms-99',
+        'ms-2.5',
+        'ms-big',
+        'ms-[4px]',
+        '-ms-4',
+        '-ms-2.5',
+        '-ms-big',
+        '-ms-[4px]',
+        'ms-[var(--my-var)]',
+        '-ms-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-ms-2\\.5 {
+      margin-inline-start: calc(var(--spacing) * -2.5);
     }
 
     .-ms-4 {
-      margin-inline-start: calc(var(--spacing-4, 1rem) * -1);
+      margin-inline-start: calc(var(--spacing) * -4);
     }
 
-    .-ms-\\[--value\\] {
-      margin-inline-start: calc(var(--value) * -1);
+    .-ms-\\[4px\\] {
+      margin-inline-start: -4px;
     }
 
-    .ms-4 {
-      margin-inline-start: var(--spacing-4, 1rem);
+    .-ms-\\[var\\(--my-var\\)\\] {
+      margin-inline-start: calc(var(--my-var) * -1);
+    }
+
+    .-ms-big {
+      margin-inline-start: calc(var(--spacing-big) * -1);
+    }
+
+    .ms-1 {
+      margin-inline-start: calc(var(--spacing) * 1);
+    }
+
+    .ms-2\\.5 {
+      margin-inline-start: calc(var(--spacing) * 2.5);
+    }
+
+    .ms-99 {
+      margin-inline-start: calc(var(--spacing) * 99);
     }
 
     .ms-\\[4px\\] {
       margin-inline-start: 4px;
     }
 
-    .ms-auto {
-      margin-inline-start: auto;
+    .ms-\\[var\\(--my-var\\)\\] {
+      margin-inline-start: var(--my-var);
+    }
+
+    .ms-big {
+      margin-inline-start: var(--spacing-big);
     }"
   `)
   expect(
-    run(['ms', 'ms-auto/foo', 'ms-4/foo', 'ms-[4px]/foo', '-ms-4/foo', '-ms-[--value]/foo']),
+    await run([
+      'ms',
+      'ms-auto/foo',
+      'ms-4/foo',
+      'ms-[4px]/foo',
+      '-ms-4/foo',
+      '-ms-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-inline-end', () => {
+test('me', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['me-auto', 'me-4', 'me-[4px]', '-me-4', '-me-[--value]'],
+      [
+        'me-1',
+        'me-99',
+        'me-2.5',
+        'me-big',
+        'me-[4px]',
+        '-me-4',
+        '-me-2.5',
+        '-me-big',
+        '-me-[4px]',
+        'me-[var(--my-var)]',
+        '-me-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-me-2\\.5 {
+      margin-inline-end: calc(var(--spacing) * -2.5);
     }
 
     .-me-4 {
-      margin-inline-end: calc(var(--spacing-4, 1rem) * -1);
+      margin-inline-end: calc(var(--spacing) * -4);
     }
 
-    .-me-\\[--value\\] {
-      margin-inline-end: calc(var(--value) * -1);
+    .-me-\\[4px\\] {
+      margin-inline-end: -4px;
     }
 
-    .me-4 {
-      margin-inline-end: var(--spacing-4, 1rem);
+    .-me-\\[var\\(--my-var\\)\\] {
+      margin-inline-end: calc(var(--my-var) * -1);
+    }
+
+    .-me-big {
+      margin-inline-end: calc(var(--spacing-big) * -1);
+    }
+
+    .me-1 {
+      margin-inline-end: calc(var(--spacing) * 1);
+    }
+
+    .me-2\\.5 {
+      margin-inline-end: calc(var(--spacing) * 2.5);
+    }
+
+    .me-99 {
+      margin-inline-end: calc(var(--spacing) * 99);
     }
 
     .me-\\[4px\\] {
       margin-inline-end: 4px;
     }
 
-    .me-auto {
-      margin-inline-end: auto;
+    .me-\\[var\\(--my-var\\)\\] {
+      margin-inline-end: var(--my-var);
+    }
+
+    .me-big {
+      margin-inline-end: var(--spacing-big);
     }"
   `)
   expect(
-    run(['me', 'me-auto/foo', 'me-4/foo', 'me-[4px]/foo', '-me-4/foo', '-me-[--value]/foo']),
+    await run([
+      'me',
+      'me-auto/foo',
+      'me-4/foo',
+      'me-[4px]/foo',
+      '-me-4/foo',
+      '-me-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-right', () => {
+test('mr', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['mr-auto', 'mr-4', 'mr-[4px]', '-mr-4', '-mr-[--value]'],
+      [
+        'mr-1',
+        'mr-99',
+        'mr-2.5',
+        'mr-big',
+        'mr-[4px]',
+        '-mr-4',
+        '-mr-2.5',
+        '-mr-big',
+        '-mr-[4px]',
+        'mr-[var(--my-var)]',
+        '-mr-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-mr-2\\.5 {
+      margin-right: calc(var(--spacing) * -2.5);
     }
 
     .-mr-4 {
-      margin-right: calc(var(--spacing-4, 1rem) * -1);
+      margin-right: calc(var(--spacing) * -4);
     }
 
-    .-mr-\\[--value\\] {
-      margin-right: calc(var(--value) * -1);
+    .-mr-\\[4px\\] {
+      margin-right: -4px;
     }
 
-    .mr-4 {
-      margin-right: var(--spacing-4, 1rem);
+    .-mr-\\[var\\(--my-var\\)\\] {
+      margin-right: calc(var(--my-var) * -1);
+    }
+
+    .-mr-big {
+      margin-right: calc(var(--spacing-big) * -1);
+    }
+
+    .mr-1 {
+      margin-right: calc(var(--spacing) * 1);
+    }
+
+    .mr-2\\.5 {
+      margin-right: calc(var(--spacing) * 2.5);
+    }
+
+    .mr-99 {
+      margin-right: calc(var(--spacing) * 99);
     }
 
     .mr-\\[4px\\] {
       margin-right: 4px;
     }
 
-    .mr-auto {
-      margin-right: auto;
+    .mr-\\[var\\(--my-var\\)\\] {
+      margin-right: var(--my-var);
+    }
+
+    .mr-big {
+      margin-right: var(--spacing-big);
     }"
   `)
   expect(
-    run(['mr', 'mr-auto/foo', 'mr-4/foo', 'mr-[4px]/foo', '-mr-4/foo', '-mr-[--value]/foo']),
+    await run([
+      'mr',
+      'mr-auto/foo',
+      'mr-4/foo',
+      'mr-[4px]/foo',
+      '-mr-4/foo',
+      '-mr-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-bottom', () => {
+test('mb', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['mb-auto', 'mb-4', 'mb-[4px]', '-mb-4', '-mb-[--value]'],
+      [
+        'mb-1',
+        'mb-99',
+        'mb-2.5',
+        'mb-big',
+        'mb-[4px]',
+        '-mb-4',
+        '-mb-2.5',
+        '-mb-big',
+        '-mb-[4px]',
+        'mb-[var(--my-var)]',
+        '-mb-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-mb-2\\.5 {
+      margin-bottom: calc(var(--spacing) * -2.5);
     }
 
     .-mb-4 {
-      margin-bottom: calc(var(--spacing-4, 1rem) * -1);
+      margin-bottom: calc(var(--spacing) * -4);
     }
 
-    .-mb-\\[--value\\] {
-      margin-bottom: calc(var(--value) * -1);
+    .-mb-\\[4px\\] {
+      margin-bottom: -4px;
     }
 
-    .mb-4 {
-      margin-bottom: var(--spacing-4, 1rem);
+    .-mb-\\[var\\(--my-var\\)\\] {
+      margin-bottom: calc(var(--my-var) * -1);
+    }
+
+    .-mb-big {
+      margin-bottom: calc(var(--spacing-big) * -1);
+    }
+
+    .mb-1 {
+      margin-bottom: calc(var(--spacing) * 1);
+    }
+
+    .mb-2\\.5 {
+      margin-bottom: calc(var(--spacing) * 2.5);
+    }
+
+    .mb-99 {
+      margin-bottom: calc(var(--spacing) * 99);
     }
 
     .mb-\\[4px\\] {
       margin-bottom: 4px;
     }
 
-    .mb-auto {
-      margin-bottom: auto;
+    .mb-\\[var\\(--my-var\\)\\] {
+      margin-bottom: var(--my-var);
+    }
+
+    .mb-big {
+      margin-bottom: var(--spacing-big);
     }"
   `)
   expect(
-    run(['mb', 'mb-auto/foo', 'mb-4/foo', 'mb-[4px]/foo', '-mb-4/foo', '-mb-[--value]/foo']),
+    await run([
+      'mb',
+      'mb-auto/foo',
+      'mb-4/foo',
+      'mb-[4px]/foo',
+      '-mb-4/foo',
+      '-mb-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin-left', () => {
+test('ml', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['ml-auto', 'ml-4', 'ml-[4px]', '-ml-4', '-ml-[--value]'],
+      [
+        'ml-1',
+        'ml-99',
+        'ml-2.5',
+        'ml-big',
+        'ml-[4px]',
+        '-ml-4',
+        '-ml-2.5',
+        '-ml-big',
+        '-ml-[4px]',
+        'ml-[var(--my-var)]',
+        '-ml-[var(--my-var)]',
+      ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .-ml-2\\.5 {
+      margin-left: calc(var(--spacing) * -2.5);
     }
 
     .-ml-4 {
-      margin-left: calc(var(--spacing-4, 1rem) * -1);
+      margin-left: calc(var(--spacing) * -4);
     }
 
-    .-ml-\\[--value\\] {
-      margin-left: calc(var(--value) * -1);
+    .-ml-\\[4px\\] {
+      margin-left: -4px;
     }
 
-    .ml-4 {
-      margin-left: var(--spacing-4, 1rem);
+    .-ml-\\[var\\(--my-var\\)\\] {
+      margin-left: calc(var(--my-var) * -1);
+    }
+
+    .-ml-big {
+      margin-left: calc(var(--spacing-big) * -1);
+    }
+
+    .ml-1 {
+      margin-left: calc(var(--spacing) * 1);
+    }
+
+    .ml-2\\.5 {
+      margin-left: calc(var(--spacing) * 2.5);
+    }
+
+    .ml-99 {
+      margin-left: calc(var(--spacing) * 99);
     }
 
     .ml-\\[4px\\] {
       margin-left: 4px;
     }
 
-    .ml-auto {
-      margin-left: auto;
+    .ml-\\[var\\(--my-var\\)\\] {
+      margin-left: var(--my-var);
+    }
+
+    .ml-big {
+      margin-left: var(--spacing-big);
     }"
   `)
   expect(
-    run(['ml', 'ml-auto/foo', 'ml-4/foo', 'ml-[4px]/foo', '-ml-4/foo', '-ml-[--value]/foo']),
+    await run([
+      'ml',
+      'ml-auto/foo',
+      'ml-4/foo',
+      'ml-[4px]/foo',
+      '-ml-4/foo',
+      '-ml-[var(--value)]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('margin sort order', () => {
+test('margin sort order', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -1536,45 +2178,43 @@ test('margin sort order', () => {
     }
 
     .m-4 {
-      margin: var(--spacing-4, 1rem);
+      margin: var(--spacing-4);
     }
 
     .mx-4 {
-      margin-left: var(--spacing-4, 1rem);
-      margin-right: var(--spacing-4, 1rem);
+      margin-inline: var(--spacing-4);
     }
 
     .my-4 {
-      margin-top: var(--spacing-4, 1rem);
-      margin-bottom: var(--spacing-4, 1rem);
+      margin-block: var(--spacing-4);
     }
 
     .ms-4 {
-      margin-inline-start: var(--spacing-4, 1rem);
+      margin-inline-start: var(--spacing-4);
     }
 
     .me-4 {
-      margin-inline-end: var(--spacing-4, 1rem);
+      margin-inline-end: var(--spacing-4);
     }
 
     .mt-4 {
-      margin-top: var(--spacing-4, 1rem);
+      margin-top: var(--spacing-4);
     }
 
     .mr-4 {
-      margin-right: var(--spacing-4, 1rem);
+      margin-right: var(--spacing-4);
     }
 
     .mb-4 {
-      margin-bottom: var(--spacing-4, 1rem);
+      margin-bottom: var(--spacing-4);
     }
 
     .ml-4 {
-      margin-left: var(--spacing-4, 1rem);
+      margin-left: var(--spacing-4);
     }"
   `)
   expect(
-    run([
+    await run([
       'm',
       'mb-4/foo',
       'me-4/foo',
@@ -1589,8 +2229,8 @@ test('margin sort order', () => {
   ).toEqual('')
 })
 
-test('box-sizing', () => {
-  expect(run(['box-border', 'box-content'])).toMatchInlineSnapshot(`
+test('box-sizing', async () => {
+  expect(await run(['box-border', 'box-content'])).toMatchInlineSnapshot(`
     ".box-border {
       box-sizing: border-box;
     }
@@ -1599,13 +2239,13 @@ test('box-sizing', () => {
       box-sizing: content-box;
     }"
   `)
-  expect(run(['box', '-box-border', '-box-content', 'box-border/foo', 'box-content/foo'])).toEqual(
-    '',
-  )
+  expect(
+    await run(['box', '-box-border', '-box-content', 'box-border/foo', 'box-content/foo']),
+  ).toEqual('')
 })
 
-test('line-clamp', () => {
-  expect(run(['line-clamp-4', 'line-clamp-99', 'line-clamp-[123]', 'line-clamp-none']))
+test('line-clamp', async () => {
+  expect(await run(['line-clamp-4', 'line-clamp-99', 'line-clamp-[123]', 'line-clamp-none']))
     .toMatchInlineSnapshot(`
       ".line-clamp-4 {
         -webkit-line-clamp: 4;
@@ -1636,8 +2276,9 @@ test('line-clamp', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       'line-clamp',
+      'line-clamp--4',
       '-line-clamp-4',
       '-line-clamp-[123]',
       '-line-clamp-none',
@@ -1651,9 +2292,9 @@ test('line-clamp', () => {
   ).toEqual('')
 })
 
-test('display', () => {
+test('display', async () => {
   expect(
-    run([
+    await run([
       'block',
       'inline-block',
       'inline',
@@ -1762,7 +2403,7 @@ test('display', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-block',
       '-inline-block',
       '-inline',
@@ -1809,9 +2450,38 @@ test('display', () => {
   ).toEqual('')
 })
 
-test('aspect-ratio', () => {
-  expect(run(['aspect-video', 'aspect-[10/9]', 'aspect-4/3'])).toMatchInlineSnapshot(`
-    ".aspect-4\\/3 {
+test('field-sizing', async () => {
+  expect(await run(['field-sizing-content', 'field-sizing-fixed'])).toMatchInlineSnapshot(`
+    ".field-sizing-content {
+      field-sizing: content;
+    }
+
+    .field-sizing-fixed {
+      field-sizing: fixed;
+    }"
+  `)
+  expect(
+    await run(['field-sizing-[other]', '-field-sizing-content', '-field-sizing-fixed']),
+  ).toEqual('')
+})
+
+test('aspect-ratio', async () => {
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --aspect-video: 16 / 9;
+        }
+        @tailwind utilities;
+      `,
+      ['aspect-video', 'aspect-[10/9]', 'aspect-4/3'],
+    ),
+  ).toMatchInlineSnapshot(`
+    ":root {
+      --aspect-video: 16 / 9;
+    }
+
+    .aspect-4\\/3 {
       aspect-ratio: 4 / 3;
     }
 
@@ -1820,11 +2490,11 @@ test('aspect-ratio', () => {
     }
 
     .aspect-video {
-      aspect-ratio: 16 / 9;
+      aspect-ratio: var(--aspect-video);
     }"
   `)
   expect(
-    run([
+    await run([
       'aspect',
       'aspect-potato',
       '-aspect-video',
@@ -1833,13 +2503,16 @@ test('aspect-ratio', () => {
       'aspect-video/foo',
       'aspect-[10/9]/foo',
       'aspect-4/3/foo',
+      'aspect--4/3',
+      'aspect--4/-3',
+      'aspect-4/-3',
     ]),
   ).toEqual('')
 })
 
-test('size', () => {
+test('size', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -1868,8 +2541,8 @@ test('size', () => {
     }
 
     .size-4 {
-      width: var(--spacing-4, 1rem);
-      height: var(--spacing-4, 1rem);
+      width: var(--spacing-4);
+      height: var(--spacing-4);
     }
 
     .size-\\[4px\\] {
@@ -1903,8 +2576,12 @@ test('size', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'size',
+      'size--1',
+      'size--1/2',
+      'size--1/-2',
+      'size-1/-2',
       '-size-4',
       '-size-1/2',
       '-size-[4px]',
@@ -1920,9 +2597,9 @@ test('size', () => {
   ).toEqual('')
 })
 
-test('width', () => {
+test('width', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -1957,7 +2634,7 @@ test('width', () => {
     }
 
     .w-4 {
-      width: var(--spacing-4, 1rem);
+      width: var(--spacing-4);
     }
 
     .w-\\[4px\\] {
@@ -2001,12 +2678,16 @@ test('width', () => {
     }
 
     .w-xl {
-      width: var(--width-xl, 36rem);
+      width: var(--width-xl);
     }"
   `)
   expect(
-    run([
+    await run([
       'w',
+      'w--1',
+      'w--1/2',
+      'w--1/-2',
+      'w-1/-2',
       '-w-4',
       '-w-1/2',
       '-w-[4px]',
@@ -2027,13 +2708,13 @@ test('width', () => {
   ).toEqual('')
 })
 
-test('min-width', () => {
+test('min-width', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
-          --width-xl: 36rem;
+          --container-xl: 36rem;
         }
         @tailwind utilities;
       `,
@@ -2051,11 +2732,11 @@ test('min-width', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
-      --width-xl: 36rem;
+      --container-xl: 36rem;
     }
 
     .min-w-4 {
-      min-width: var(--spacing-4, 1rem);
+      min-width: var(--spacing-4);
     }
 
     .min-w-\\[4px\\] {
@@ -2083,11 +2764,11 @@ test('min-width', () => {
     }
 
     .min-w-xl {
-      min-width: var(--width-xl, 36rem);
+      min-width: var(--container-xl);
     }"
   `)
   expect(
-    run([
+    await run([
       'min-w',
       '-min-w-4',
       '-min-w-[4px]',
@@ -2103,13 +2784,13 @@ test('min-width', () => {
   ).toEqual('')
 })
 
-test('max-width', () => {
+test('max-width', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
-          --width-xl: 36rem;
+          --container-xl: 36rem;
         }
         @tailwind utilities;
       `,
@@ -2127,11 +2808,11 @@ test('max-width', () => {
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
-      --width-xl: 36rem;
+      --container-xl: 36rem;
     }
 
     .max-w-4 {
-      max-width: var(--spacing-4, 1rem);
+      max-width: var(--spacing-4);
     }
 
     .max-w-\\[4px\\] {
@@ -2155,11 +2836,11 @@ test('max-width', () => {
     }
 
     .max-w-xl {
-      max-width: var(--width-xl, 36rem);
+      max-width: var(--container-xl);
     }"
   `)
   expect(
-    run([
+    await run([
       'max-w',
       '-max-w-4',
       '-max-w-[4px]',
@@ -2175,9 +2856,9 @@ test('max-width', () => {
   ).toEqual('')
 })
 
-test('height', () => {
+test('height', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -2209,7 +2890,7 @@ test('height', () => {
     }
 
     .h-4 {
-      height: var(--spacing-4, 1rem);
+      height: var(--spacing-4);
     }
 
     .h-\\[4px\\] {
@@ -2253,9 +2934,13 @@ test('height', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'h',
       '-h-4',
+      'h--1',
+      'h--1/2',
+      'h--1/-2',
+      'h-1/-2',
       '-h-1/2',
       '-h-[4px]',
       'h-full/foo',
@@ -2274,9 +2959,9 @@ test('height', () => {
   ).toEqual('')
 })
 
-test('min-height', () => {
+test('min-height', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -2303,7 +2988,7 @@ test('min-height', () => {
     }
 
     .min-h-4 {
-      min-height: var(--spacing-4, 1rem);
+      min-height: var(--spacing-4);
     }
 
     .min-h-\\[4px\\] {
@@ -2347,7 +3032,7 @@ test('min-height', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'min-h',
       '-min-h-4',
       '-min-h-[4px]',
@@ -2366,9 +3051,9 @@ test('min-height', () => {
   ).toEqual('')
 })
 
-test('max-height', () => {
+test('max-height', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -2395,7 +3080,7 @@ test('max-height', () => {
     }
 
     .max-h-4 {
-      max-height: var(--spacing-4, 1rem);
+      max-height: var(--spacing-4);
     }
 
     .max-h-\\[4px\\] {
@@ -2439,7 +3124,7 @@ test('max-height', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'max-h',
       '-max-h-4',
       '-max-h-[4px]',
@@ -2458,9 +3143,241 @@ test('max-height', () => {
   ).toEqual('')
 })
 
-test('flex', () => {
+describe('container', () => {
+  test('creates the right media queries and sorts it before width', async () => {
+    expect(
+      await compileCss(
+        css`
+          @theme {
+            --breakpoint-sm: 40rem;
+            --breakpoint-md: 48rem;
+            --breakpoint-lg: 64rem;
+            --breakpoint-xl: 80rem;
+            --breakpoint-2xl: 96rem;
+          }
+          @tailwind utilities;
+        `,
+        ['w-1/2', 'container', 'max-w-[var(--breakpoint-sm)]'],
+      ),
+    ).toMatchInlineSnapshot(`
+      ":root {
+        --breakpoint-sm: 40rem;
+        --breakpoint-md: 48rem;
+        --breakpoint-lg: 64rem;
+        --breakpoint-xl: 80rem;
+        --breakpoint-2xl: 96rem;
+      }
+
+      .container {
+        width: 100%;
+      }
+
+      @media (width >= 40rem) {
+        .container {
+          max-width: 40rem;
+        }
+      }
+
+      @media (width >= 48rem) {
+        .container {
+          max-width: 48rem;
+        }
+      }
+
+      @media (width >= 64rem) {
+        .container {
+          max-width: 64rem;
+        }
+      }
+
+      @media (width >= 80rem) {
+        .container {
+          max-width: 80rem;
+        }
+      }
+
+      @media (width >= 96rem) {
+        .container {
+          max-width: 96rem;
+        }
+      }
+
+      .w-1\\/2 {
+        width: 50%;
+      }
+
+      .max-w-\\[var\\(--breakpoint-sm\\)\\] {
+        max-width: var(--breakpoint-sm);
+      }"
+    `)
+  })
+
+  test('sorts breakpoints based on unit and then in ascending aOrder', async () => {
+    expect(
+      await compileCss(
+        css`
+          @theme reference {
+            --breakpoint-lg: 64rem;
+            --breakpoint-xl: 80rem;
+            --breakpoint-3xl: 1600px;
+            --breakpoint-sm: 40em;
+            --breakpoint-2xl: 96rem;
+            --breakpoint-xs: 30px;
+            --breakpoint-md: 48em;
+          }
+          @tailwind utilities;
+        `,
+        ['container'],
+      ),
+    ).toMatchInlineSnapshot(`
+      ".container {
+        width: 100%;
+      }
+
+      @media (width >= 40em) {
+        .container {
+          max-width: 40em;
+        }
+      }
+
+      @media (width >= 48em) {
+        .container {
+          max-width: 48em;
+        }
+      }
+
+      @media (width >= 30px) {
+        .container {
+          max-width: 30px;
+        }
+      }
+
+      @media (width >= 1600px) {
+        .container {
+          max-width: 1600px;
+        }
+      }
+
+      @media (width >= 64rem) {
+        .container {
+          max-width: 64rem;
+        }
+      }
+
+      @media (width >= 80rem) {
+        .container {
+          max-width: 80rem;
+        }
+      }
+
+      @media (width >= 96rem) {
+        .container {
+          max-width: 96rem;
+        }
+      }"
+    `)
+  })
+
+  test('custom `@utility container` always follow the core utility ', async () => {
+    expect(
+      await compileCss(
+        css`
+          @theme {
+            --breakpoint-sm: 40rem;
+            --breakpoint-md: 48rem;
+            --breakpoint-lg: 64rem;
+            --breakpoint-xl: 80rem;
+            --breakpoint-2xl: 96rem;
+          }
+          @tailwind utilities;
+
+          @utility container {
+            margin-inline: auto;
+            padding-inline: 1rem;
+
+            @media (width >= theme(--breakpoint-sm)) {
+              padding-inline: 2rem;
+            }
+          }
+        `,
+        ['w-1/2', 'container', 'max-w-[var(--breakpoint-sm)]'],
+      ),
+    ).toMatchInlineSnapshot(`
+      ":root {
+        --breakpoint-sm: 40rem;
+        --breakpoint-md: 48rem;
+        --breakpoint-lg: 64rem;
+        --breakpoint-xl: 80rem;
+        --breakpoint-2xl: 96rem;
+      }
+
+      .container {
+        width: 100%;
+      }
+
+      @media (width >= 40rem) {
+        .container {
+          max-width: 40rem;
+        }
+      }
+
+      @media (width >= 48rem) {
+        .container {
+          max-width: 48rem;
+        }
+      }
+
+      @media (width >= 64rem) {
+        .container {
+          max-width: 64rem;
+        }
+      }
+
+      @media (width >= 80rem) {
+        .container {
+          max-width: 80rem;
+        }
+      }
+
+      @media (width >= 96rem) {
+        .container {
+          max-width: 96rem;
+        }
+      }
+
+      .container {
+        margin-inline: auto;
+        padding-inline: 1rem;
+      }
+
+      @media (width >= 40rem) {
+        .container {
+          padding-inline: 2rem;
+        }
+      }
+
+      .w-1\\/2 {
+        width: 50%;
+      }
+
+      .max-w-\\[var\\(--breakpoint-sm\\)\\] {
+        max-width: var(--breakpoint-sm);
+      }"
+    `)
+  })
+})
+
+test('flex', async () => {
   expect(
-    run(['flex-1', 'flex-99', 'flex-1/2', 'flex-auto', 'flex-initial', 'flex-none', 'flex-[123]']),
+    await run([
+      'flex-1',
+      'flex-99',
+      'flex-1/2',
+      'flex-auto',
+      'flex-initial',
+      'flex-none',
+      'flex-[123]',
+    ]),
   ).toMatchInlineSnapshot(`
     ".flex-1 {
       flex: 1;
@@ -2491,8 +3408,9 @@ test('flex', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-flex-1',
+      'flex--1',
       '-flex-auto',
       '-flex-initial',
       '-flex-none',
@@ -2500,6 +3418,9 @@ test('flex', () => {
       'flex-unknown',
       'flex-1/foo',
       'flex-99/foo',
+      'flex--1/2',
+      'flex--1/-2',
+      'flex-1/-2',
       'flex-1/2/foo',
       'flex-auto/foo',
       'flex-initial/foo',
@@ -2509,8 +3430,8 @@ test('flex', () => {
   ).toEqual('')
 })
 
-test('flex-shrink', () => {
-  expect(run(['shrink', 'shrink-0', 'shrink-[123]'])).toMatchInlineSnapshot(`
+test('flex-shrink', async () => {
+  expect(await run(['shrink', 'shrink-0', 'shrink-[123]'])).toMatchInlineSnapshot(`
     ".shrink {
       flex-shrink: 1;
     }
@@ -2524,8 +3445,10 @@ test('flex-shrink', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-shrink',
+      'shrink--1',
+      'shrink-1.5',
       '-shrink-0',
       '-shrink-[123]',
       'shrink-unknown',
@@ -2536,8 +3459,8 @@ test('flex-shrink', () => {
   ).toEqual('')
 })
 
-test('flex-grow', () => {
-  expect(run(['grow', 'grow-0', 'grow-[123]'])).toMatchInlineSnapshot(`
+test('flex-grow', async () => {
+  expect(await run(['grow', 'grow-0', 'grow-[123]'])).toMatchInlineSnapshot(`
     ".grow {
       flex-grow: 1;
     }
@@ -2551,8 +3474,10 @@ test('flex-grow', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-grow',
+      'grow--1',
+      'grow-1.5',
       '-grow-0',
       '-grow-[123]',
       'grow-unknown',
@@ -2563,12 +3488,12 @@ test('flex-grow', () => {
   ).toEqual('')
 })
 
-test('flex-basis', () => {
+test('flex-basis', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --width-xl: 36rem;
+          --container-xl: 36rem;
         }
         @tailwind utilities;
       `,
@@ -2576,7 +3501,7 @@ test('flex-basis', () => {
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --width-xl: 36rem;
+      --container-xl: 36rem;
     }
 
     .basis-11\\/12 {
@@ -2596,12 +3521,16 @@ test('flex-basis', () => {
     }
 
     .basis-xl {
-      flex-basis: var(--width-xl, 36rem);
+      flex-basis: var(--container-xl);
     }"
   `)
   expect(
-    run([
+    await run([
       'basis',
+      'basis--1',
+      'basis--1/2',
+      'basis--1/-2',
+      'basis-1/-2',
       '-basis-full',
       '-basis-[123px]',
       'basis-auto/foo',
@@ -2613,8 +3542,8 @@ test('flex-basis', () => {
   ).toEqual('')
 })
 
-test('table-layout', () => {
-  expect(run(['table-auto', 'table-fixed'])).toMatchInlineSnapshot(`
+test('table-layout', async () => {
+  expect(await run(['table-auto', 'table-fixed'])).toMatchInlineSnapshot(`
     ".table-auto {
       table-layout: auto;
     }
@@ -2623,11 +3552,13 @@ test('table-layout', () => {
       table-layout: fixed;
     }"
   `)
-  expect(run(['-table-auto', '-table-fixed', 'table-auto/foo', 'table-fixed/foo'])).toEqual('')
+  expect(await run(['-table-auto', '-table-fixed', 'table-auto/foo', 'table-fixed/foo'])).toEqual(
+    '',
+  )
 })
 
-test('caption-side', () => {
-  expect(run(['caption-top', 'caption-bottom'])).toMatchInlineSnapshot(`
+test('caption-side', async () => {
+  expect(await run(['caption-top', 'caption-bottom'])).toMatchInlineSnapshot(`
     ".caption-bottom {
       caption-side: bottom;
     }
@@ -2636,13 +3567,13 @@ test('caption-side', () => {
       caption-side: top;
     }"
   `)
-  expect(run(['-caption-top', '-caption-bottom', 'caption-top/foo', 'caption-bottom/foo'])).toEqual(
-    '',
-  )
+  expect(
+    await run(['-caption-top', '-caption-bottom', 'caption-top/foo', 'caption-bottom/foo']),
+  ).toEqual('')
 })
 
-test('border-collapse', () => {
-  expect(run(['border-collapse', 'border-separate'])).toMatchInlineSnapshot(`
+test('border-collapse', async () => {
+  expect(await run(['border-collapse', 'border-separate'])).toMatchInlineSnapshot(`
     ".border-collapse {
       border-collapse: collapse;
     }
@@ -2652,13 +3583,18 @@ test('border-collapse', () => {
     }"
   `)
   expect(
-    run(['-border-collapse', '-border-separate', 'border-collapse/foo', 'border-separate/foo']),
+    await run([
+      '-border-collapse',
+      '-border-separate',
+      'border-collapse/foo',
+      'border-separate/foo',
+    ]),
   ).toEqual('')
 })
 
-test('border-spacing', () => {
+test('border-spacing', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-1: 0.25rem;
@@ -2673,8 +3609,8 @@ test('border-spacing', () => {
     }
 
     .border-spacing-1 {
-      --tw-border-spacing-x: var(--spacing-1, .25rem);
-      --tw-border-spacing-y: var(--spacing-1, .25rem);
+      --tw-border-spacing-x: var(--spacing-1);
+      --tw-border-spacing-y: var(--spacing-1);
       border-spacing: var(--tw-border-spacing-x) var(--tw-border-spacing-y);
     }
 
@@ -2682,15 +3618,6 @@ test('border-spacing', () => {
       --tw-border-spacing-x: 123px;
       --tw-border-spacing-y: 123px;
       border-spacing: var(--tw-border-spacing-x) var(--tw-border-spacing-y);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-border-spacing-x: 0;
-          --tw-border-spacing-y: 0;
-        }
-      }
     }
 
     @property --tw-border-spacing-x {
@@ -2706,7 +3633,7 @@ test('border-spacing', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'border-spacing',
       '-border-spacing-1',
       '-border-spacing-[123px]',
@@ -2716,9 +3643,9 @@ test('border-spacing', () => {
   ).toEqual('')
 })
 
-test('border-spacing-x', () => {
+test('border-spacing-x', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-1: 0.25rem;
@@ -2733,22 +3660,13 @@ test('border-spacing-x', () => {
     }
 
     .border-spacing-x-1 {
-      --tw-border-spacing-x: var(--spacing-1, .25rem);
+      --tw-border-spacing-x: var(--spacing-1);
       border-spacing: var(--tw-border-spacing-x) var(--tw-border-spacing-y);
     }
 
     .border-spacing-x-\\[123px\\] {
       --tw-border-spacing-x: 123px;
       border-spacing: var(--tw-border-spacing-x) var(--tw-border-spacing-y);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-border-spacing-x: 0;
-          --tw-border-spacing-y: 0;
-        }
-      }
     }
 
     @property --tw-border-spacing-x {
@@ -2764,7 +3682,7 @@ test('border-spacing-x', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'border-spacing-x',
       '-border-spacing-x-1',
       '-border-spacing-x-[123px]',
@@ -2774,9 +3692,9 @@ test('border-spacing-x', () => {
   ).toEqual('')
 })
 
-test('border-spacing-y', () => {
+test('border-spacing-y', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-1: 0.25rem;
@@ -2791,22 +3709,13 @@ test('border-spacing-y', () => {
     }
 
     .border-spacing-y-1 {
-      --tw-border-spacing-y: var(--spacing-1, .25rem);
+      --tw-border-spacing-y: var(--spacing-1);
       border-spacing: var(--tw-border-spacing-x) var(--tw-border-spacing-y);
     }
 
     .border-spacing-y-\\[123px\\] {
       --tw-border-spacing-y: 123px;
       border-spacing: var(--tw-border-spacing-x) var(--tw-border-spacing-y);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-border-spacing-x: 0;
-          --tw-border-spacing-y: 0;
-        }
-      }
     }
 
     @property --tw-border-spacing-x {
@@ -2822,7 +3731,7 @@ test('border-spacing-y', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'border-spacing-x',
       '-border-spacing-y-1',
       '-border-spacing-y-[123px]',
@@ -2832,9 +3741,9 @@ test('border-spacing-y', () => {
   ).toEqual('')
 })
 
-test('origin', () => {
+test('origin', async () => {
   expect(
-    run([
+    await run([
       'origin-center',
       'origin-top',
       'origin-top-right',
@@ -2845,15 +3754,15 @@ test('origin', () => {
       'origin-left',
       'origin-top-left',
       'origin-[50px_100px]',
-      'origin-[--value]',
+      'origin-[var(--value)]',
     ]),
   ).toMatchInlineSnapshot(`
-    ".origin-\\[--value\\] {
-      transform-origin: var(--value);
+    ".origin-\\[50px_100px\\] {
+      transform-origin: 50px 100px;
     }
 
-    .origin-\\[50px_100px\\] {
-      transform-origin: 50px 100px;
+    .origin-\\[var\\(--value\\)\\] {
+      transform-origin: var(--value);
     }
 
     .origin-bottom {
@@ -2893,9 +3802,9 @@ test('origin', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-origin-center',
-      '-origin-[--value]',
+      '-origin-[var(--value)]',
       'origin-center/foo',
       'origin-top/foo',
       'origin-top-right/foo',
@@ -2906,14 +3815,14 @@ test('origin', () => {
       'origin-left/foo',
       'origin-top-left/foo',
       'origin-[50px_100px]/foo',
-      'origin-[--value]/foo',
+      'origin-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('perspective-origin', () => {
+test('perspective-origin', async () => {
   expect(
-    run([
+    await run([
       'perspective-origin-center',
       'perspective-origin-top',
       'perspective-origin-top-right',
@@ -2924,15 +3833,15 @@ test('perspective-origin', () => {
       'perspective-origin-left',
       'perspective-origin-top-left',
       'perspective-origin-[50px_100px]',
-      'perspective-origin-[--value]',
+      'perspective-origin-[var(--value)]',
     ]),
   ).toMatchInlineSnapshot(`
-    ".perspective-origin-\\[--value\\] {
-      perspective-origin: var(--value);
+    ".perspective-origin-\\[50px_100px\\] {
+      perspective-origin: 50px 100px;
     }
 
-    .perspective-origin-\\[50px_100px\\] {
-      perspective-origin: 50px 100px;
+    .perspective-origin-\\[var\\(--value\\)\\] {
+      perspective-origin: var(--value);
     }
 
     .perspective-origin-bottom {
@@ -2972,9 +3881,9 @@ test('perspective-origin', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-perspective-origin-center',
-      '-perspective-origin-[--value]',
+      '-perspective-origin-[var(--value)]',
       'perspective-origin-center/foo',
       'perspective-origin-top/foo',
       'perspective-origin-top-right/foo',
@@ -2985,311 +3894,416 @@ test('perspective-origin', () => {
       'perspective-origin-left/foo',
       'perspective-origin-top-left/foo',
       'perspective-origin-[50px_100px]/foo',
-      'perspective-origin-[--value]/foo',
+      'perspective-origin-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('translate', () => {
+test('translate', async () => {
   expect(
-    run([
+    await run([
       'translate-1/2',
       'translate-full',
       '-translate-full',
       'translate-[123px]',
-      '-translate-[--value]',
+      '-translate-[var(--value)]',
     ]),
   ).toMatchInlineSnapshot(`
-    ".-translate-\\[--value\\] {
+    ".-translate-\\[var\\(--value\\)\\] {
       --tw-translate-x: calc(var(--value) * -1);
       --tw-translate-y: calc(var(--value) * -1);
-      --tw-translate-z: calc(var(--value) * -1);
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
 
     .-translate-full {
       --tw-translate-x: -100%;
       --tw-translate-y: -100%;
-      --tw-translate-z: -100%;
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
 
     .translate-1\\/2 {
       --tw-translate-x: calc(1 / 2 * 100%);
       --tw-translate-y: calc(1 / 2 * 100%);
-      --tw-translate-z: calc(1 / 2 * 100%);
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
 
     .translate-\\[123px\\] {
       --tw-translate-x: 123px;
       --tw-translate-y: 123px;
-      --tw-translate-z: 123px;
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
 
     .translate-full {
       --tw-translate-x: 100%;
       --tw-translate-y: 100%;
-      --tw-translate-z: 100%;
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-translate-x: 0;
-          --tw-translate-y: 0;
-          --tw-translate-z: 0;
-        }
-      }
-    }
-
     @property --tw-translate-x {
-      syntax: "<length> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-translate-y {
-      syntax: "<length> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-translate-z {
-      syntax: "<length>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
   expect(
-    run([
+    await run([
       'translate',
+      'translate--1',
+      'translate--1/2',
+      'translate--1/-2',
+      'translate-1/-2',
       'translate-1/2/foo',
       'translate-full/foo',
       '-translate-full/foo',
       'translate-[123px]/foo',
-      '-translate-[--value]/foo',
+      '-translate-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('translate-x', () => {
-  expect(run(['translate-x-full', '-translate-x-full', 'translate-x-px', '-translate-x-[--value]']))
-    .toMatchInlineSnapshot(`
-      ".-translate-x-\\[--value\\] {
-        --tw-translate-x: calc(var(--value) * -1);
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      .-translate-x-full {
-        --tw-translate-x: -100%;
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      .translate-x-full {
-        --tw-translate-x: 100%;
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      .translate-x-px {
-        --tw-translate-x: 1px;
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      @supports (-moz-orient: inline) {
-        @layer base {
-          *, :before, :after, ::backdrop {
-            --tw-translate-x: 0;
-            --tw-translate-y: 0;
-            --tw-translate-z: 0;
-          }
-        }
-      }
-
-      @property --tw-translate-x {
-        syntax: "<length> | <percentage>";
-        inherits: false;
-        initial-value: 0;
-      }
-
-      @property --tw-translate-y {
-        syntax: "<length> | <percentage>";
-        inherits: false;
-        initial-value: 0;
-      }
-
-      @property --tw-translate-z {
-        syntax: "<length>";
-        inherits: false;
-        initial-value: 0;
-      }"
-    `)
+test('translate-x', async () => {
   expect(
-    run([
+    await run([
+      'translate-x-full',
+      '-translate-x-full',
+      'translate-x-px',
+      '-translate-x-[var(--value)]',
+    ]),
+  ).toMatchInlineSnapshot(`
+    ".-translate-x-\\[var\\(--value\\)\\] {
+      --tw-translate-x: calc(var(--value) * -1);
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .-translate-x-full {
+      --tw-translate-x: -100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-x-full {
+      --tw-translate-x: 100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-x-px {
+      --tw-translate-x: 1px;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    @property --tw-translate-x {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-y {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-z {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }"
+  `)
+  expect(
+    await run([
       'translate-x',
+      'translate-x--1',
+      'translate-x--1/2',
+      'translate-x--1/-2',
+      'translate-x-1/-2',
       'translate-x-full/foo',
       '-translate-x-full/foo',
       'translate-x-px/foo',
-      '-translate-x-[--value]/foo',
+      '-translate-x-[var(--value)]/foo',
+    ]),
+  ).toEqual('')
+
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing: 0.25rem;
+        }
+        @tailwind utilities;
+      `,
+      ['translate-x-full', '-translate-x-full', 'translate-x-px', '-translate-x-[var(--value)]'],
+    ),
+  ).toMatchInlineSnapshot(`
+    ":root {
+      --spacing: .25rem;
+    }
+
+    .-translate-x-\\[var\\(--value\\)\\] {
+      --tw-translate-x: calc(var(--value) * -1);
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .-translate-x-full {
+      --tw-translate-x: -100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-x-full {
+      --tw-translate-x: 100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-x-px {
+      --tw-translate-x: 1px;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    @property --tw-translate-x {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-y {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-z {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }"
+  `)
+  expect(
+    await run([
+      'perspective',
+      '-perspective',
+      'perspective-potato',
+      'perspective-123',
+      'perspective-normal/foo',
+      'perspective-dramatic/foo',
+      'perspective-none/foo',
+      'perspective-[456px]/foo',
     ]),
   ).toEqual('')
 })
 
-test('translate-y', () => {
-  expect(run(['translate-y-full', '-translate-y-full', 'translate-y-px', '-translate-y-[--value]']))
-    .toMatchInlineSnapshot(`
-      ".-translate-y-\\[--value\\] {
-        --tw-translate-y: calc(var(--value) * -1);
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      .-translate-y-full {
-        --tw-translate-y: -100%;
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      .translate-y-full {
-        --tw-translate-y: 100%;
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      .translate-y-px {
-        --tw-translate-y: 1px;
-        translate: var(--tw-translate-x) var(--tw-translate-y);
-      }
-
-      @supports (-moz-orient: inline) {
-        @layer base {
-          *, :before, :after, ::backdrop {
-            --tw-translate-x: 0;
-            --tw-translate-y: 0;
-            --tw-translate-z: 0;
-          }
-        }
-      }
-
-      @property --tw-translate-x {
-        syntax: "<length> | <percentage>";
-        inherits: false;
-        initial-value: 0;
-      }
-
-      @property --tw-translate-y {
-        syntax: "<length> | <percentage>";
-        inherits: false;
-        initial-value: 0;
-      }
-
-      @property --tw-translate-z {
-        syntax: "<length>";
-        inherits: false;
-        initial-value: 0;
-      }"
-    `)
+test('translate-y', async () => {
   expect(
-    run([
+    await run([
+      'translate-y-full',
+      '-translate-y-full',
+      'translate-y-px',
+      '-translate-y-[var(--value)]',
+    ]),
+  ).toMatchInlineSnapshot(`
+    ".-translate-y-\\[var\\(--value\\)\\] {
+      --tw-translate-y: calc(var(--value) * -1);
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .-translate-y-full {
+      --tw-translate-y: -100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-y-full {
+      --tw-translate-y: 100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-y-px {
+      --tw-translate-y: 1px;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    @property --tw-translate-x {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-y {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-z {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }"
+  `)
+  expect(
+    await run([
       'translate-y',
+      'translate-y--1',
+      'translate-y--1/2',
+      'translate-y--1/-2',
+      'translate-y-1/-2',
       'translate-y-full/foo',
       '-translate-y-full/foo',
       'translate-y-px/foo',
-      '-translate-y-[--value]/foo',
+      '-translate-y-[var(--value)]/foo',
+    ]),
+  ).toEqual('')
+
+  expect(
+    await compileCss(
+      css`
+        @theme {
+          --spacing: 0.25rem;
+        }
+        @tailwind utilities;
+      `,
+      ['translate-y-full', '-translate-y-full', 'translate-y-px', '-translate-y-[var(--value)]'],
+    ),
+  ).toMatchInlineSnapshot(`
+    ":root {
+      --spacing: .25rem;
+    }
+
+    .-translate-y-\\[var\\(--value\\)\\] {
+      --tw-translate-y: calc(var(--value) * -1);
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .-translate-y-full {
+      --tw-translate-y: -100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-y-full {
+      --tw-translate-y: 100%;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    .translate-y-px {
+      --tw-translate-y: 1px;
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+
+    @property --tw-translate-x {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-y {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @property --tw-translate-z {
+      syntax: "*";
+      inherits: false;
+      initial-value: 0;
+    }"
+  `)
+  expect(
+    await run([
+      'perspective',
+      '-perspective',
+      'perspective-potato',
+      'perspective-123',
+      'perspective-normal/foo',
+      'perspective-dramatic/foo',
+      'perspective-none/foo',
+      'perspective-[456px]/foo',
     ]),
   ).toEqual('')
 })
 
-test('translate-z', () => {
-  expect(run(['translate-y-px', '-translate-z-[--value]'])).toMatchInlineSnapshot(`
+test('translate-z', async () => {
+  expect(await run(['translate-y-px', '-translate-z-[var(--value)]'])).toMatchInlineSnapshot(`
     ".translate-y-px {
       --tw-translate-y: 1px;
       translate: var(--tw-translate-x) var(--tw-translate-y);
     }
 
-    .-translate-z-\\[--value\\] {
+    .-translate-z-\\[var\\(--value\\)\\] {
       --tw-translate-z: calc(var(--value) * -1);
       translate: var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-translate-x: 0;
-          --tw-translate-y: 0;
-          --tw-translate-z: 0;
-        }
-      }
-    }
-
     @property --tw-translate-x {
-      syntax: "<length> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-translate-y {
-      syntax: "<length> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-translate-z {
-      syntax: "<length>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
   expect(
-    run([
+    await run([
       'translate-z',
+      'translate-z--1',
+      'translate-z--1/2',
+      'translate-z--1/-2',
+      'translate-z-1/-2',
       'translate-z-full',
       '-translate-z-full',
       'translate-z-1/2',
       'translate-y-px/foo',
-      '-translate-z-[--value]/foo',
+      '-translate-z-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('translate-3d', () => {
-  expect(run(['translate-3d'])).toMatchInlineSnapshot(`
+test('translate-3d', async () => {
+  expect(await run(['translate-3d'])).toMatchInlineSnapshot(`
     ".translate-3d {
       translate: var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-translate-x: 0;
-          --tw-translate-y: 0;
-          --tw-translate-z: 0;
-        }
-      }
-    }
-
     @property --tw-translate-x {
-      syntax: "<length> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-translate-y {
-      syntax: "<length> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-translate-z {
-      syntax: "<length>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['-translate-3d', 'translate-3d/foo'])).toEqual('')
+  expect(await run(['-translate-3d', 'translate-3d/foo'])).toEqual('')
 })
 
-test('rotate', () => {
-  expect(run(['rotate-45', '-rotate-45', 'rotate-[123deg]', 'rotate-[0.3_0.7_1_45deg]']))
+test('rotate', async () => {
+  expect(await run(['rotate-45', '-rotate-45', 'rotate-[123deg]', 'rotate-[0.3_0.7_1_45deg]']))
     .toMatchInlineSnapshot(`
     ".-rotate-45 {
       rotate: -45deg;
@@ -3308,9 +4322,10 @@ test('rotate', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'rotate',
       'rotate-z',
+      'rotate--2',
       'rotate-unknown',
       'rotate-45/foo',
       '-rotate-45/foo',
@@ -3320,10 +4335,10 @@ test('rotate', () => {
   ).toEqual('')
 })
 
-test('rotate-x', () => {
-  expect(run(['rotate-x-45', '-rotate-x-45', 'rotate-x-[123deg]'])).toMatchInlineSnapshot(`
+test('rotate-x', async () => {
+  expect(await run(['rotate-x-45', '-rotate-x-45', 'rotate-x-[123deg]'])).toMatchInlineSnapshot(`
     ".-rotate-x-45 {
-      --tw-rotate-x: calc(rotateX(45deg) * -1);
+      --tw-rotate-x: rotateX(calc(45deg * -1));
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
     }
 
@@ -3333,55 +4348,44 @@ test('rotate-x', () => {
     }
 
     .rotate-x-\\[123deg\\] {
-      --tw-rotate-x: 123deg;
+      --tw-rotate-x: rotateX(123deg);
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-rotate-x: rotateX(0);
-          --tw-rotate-y: rotateY(0);
-          --tw-rotate-z: rotateZ(0);
-          --tw-skew-x: skewX(0);
-          --tw-skew-y: skewY(0);
-        }
-      }
-    }
-
     @property --tw-rotate-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateX(0);
     }
 
     @property --tw-rotate-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateY(0);
     }
 
     @property --tw-rotate-z {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateZ(0);
     }
 
     @property --tw-skew-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewX(0);
     }
 
     @property --tw-skew-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewY(0);
     }"
   `)
   expect(
-    run([
+    await run([
       'rotate-x',
+      'rotate-x--1',
       '-rotate-x',
       'rotate-x-potato',
       'rotate-x-45/foo',
@@ -3391,68 +4395,63 @@ test('rotate-x', () => {
   ).toEqual('')
 })
 
-test('rotate-y', () => {
-  expect(run(['rotate-y-45', '-rotate-y-45', 'rotate-y-[123deg]'])).toMatchInlineSnapshot(`
-    ".-rotate-y-45 {
-      --tw-rotate-y: calc(rotateY(45deg) * -1);
-      transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
-    }
-
-    .rotate-y-45 {
-      --tw-rotate-y: rotateY(45deg);
-      transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
-    }
-
-    .rotate-y-\\[123deg\\] {
-      --tw-rotate-y: 123deg;
-      transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-rotate-x: rotateX(0);
-          --tw-rotate-y: rotateY(0);
-          --tw-rotate-z: rotateZ(0);
-          --tw-skew-x: skewX(0);
-          --tw-skew-y: skewY(0);
-        }
+test('rotate-y', async () => {
+  expect(await run(['rotate-y-45', '-rotate-y-45', 'rotate-y-[123deg]', '-rotate-y-[123deg]']))
+    .toMatchInlineSnapshot(`
+      ".-rotate-y-45 {
+        --tw-rotate-y: rotateY(calc(45deg * -1));
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
       }
-    }
 
-    @property --tw-rotate-x {
-      syntax: "<transform-function>";
-      inherits: false;
-      initial-value: rotateX(0);
-    }
+      .-rotate-y-\\[123deg\\] {
+        --tw-rotate-y: rotateY(calc(123deg * -1));
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
 
-    @property --tw-rotate-y {
-      syntax: "<transform-function>";
-      inherits: false;
-      initial-value: rotateY(0);
-    }
+      .rotate-y-45 {
+        --tw-rotate-y: rotateY(45deg);
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
 
-    @property --tw-rotate-z {
-      syntax: "<transform-function>";
-      inherits: false;
-      initial-value: rotateZ(0);
-    }
+      .rotate-y-\\[123deg\\] {
+        --tw-rotate-y: rotateY(123deg);
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
 
-    @property --tw-skew-x {
-      syntax: "<transform-function>";
-      inherits: false;
-      initial-value: skewX(0);
-    }
+      @property --tw-rotate-x {
+        syntax: "*";
+        inherits: false;
+        initial-value: rotateX(0);
+      }
 
-    @property --tw-skew-y {
-      syntax: "<transform-function>";
-      inherits: false;
-      initial-value: skewY(0);
-    }"
-  `)
+      @property --tw-rotate-y {
+        syntax: "*";
+        inherits: false;
+        initial-value: rotateY(0);
+      }
+
+      @property --tw-rotate-z {
+        syntax: "*";
+        inherits: false;
+        initial-value: rotateZ(0);
+      }
+
+      @property --tw-skew-x {
+        syntax: "*";
+        inherits: false;
+        initial-value: skewX(0);
+      }
+
+      @property --tw-skew-y {
+        syntax: "*";
+        inherits: false;
+        initial-value: skewY(0);
+      }"
+    `)
   expect(
-    run([
+    await run([
       'rotate-y',
+      'rotate-y--1',
       '-rotate-y',
       'rotate-y-potato',
       'rotate-y-45/foo',
@@ -3462,8 +4461,74 @@ test('rotate-y', () => {
   ).toEqual('')
 })
 
-test('skew', () => {
-  expect(run(['skew-6', '-skew-6', 'skew-[123deg]'])).toMatchInlineSnapshot(`
+test('rotate-z', async () => {
+  expect(await run(['rotate-z-45', '-rotate-z-45', 'rotate-z-[123deg]', '-rotate-z-[123deg]']))
+    .toMatchInlineSnapshot(`
+      ".-rotate-z-45 {
+        --tw-rotate-z: rotateZ(calc(45deg * -1));
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
+
+      .-rotate-z-\\[123deg\\] {
+        --tw-rotate-z: rotateZ(calc(123deg * -1));
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
+
+      .rotate-z-45 {
+        --tw-rotate-z: rotateZ(45deg);
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
+
+      .rotate-z-\\[123deg\\] {
+        --tw-rotate-z: rotateZ(123deg);
+        transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
+      }
+
+      @property --tw-rotate-x {
+        syntax: "*";
+        inherits: false;
+        initial-value: rotateX(0);
+      }
+
+      @property --tw-rotate-y {
+        syntax: "*";
+        inherits: false;
+        initial-value: rotateY(0);
+      }
+
+      @property --tw-rotate-z {
+        syntax: "*";
+        inherits: false;
+        initial-value: rotateZ(0);
+      }
+
+      @property --tw-skew-x {
+        syntax: "*";
+        inherits: false;
+        initial-value: skewX(0);
+      }
+
+      @property --tw-skew-y {
+        syntax: "*";
+        inherits: false;
+        initial-value: skewY(0);
+      }"
+    `)
+  expect(
+    await run([
+      'rotate-z',
+      'rotate-z--1',
+      '-rotate-z',
+      'rotate-z-potato',
+      'rotate-z-45/foo',
+      '-rotate-z-45/foo',
+      'rotate-z-[123deg]/foo',
+    ]),
+  ).toEqual('')
+})
+
+test('skew', async () => {
+  expect(await run(['skew-6', '-skew-6', 'skew-[123deg]'])).toMatchInlineSnapshot(`
     ".-skew-6 {
       --tw-skew-x: skewX(calc(6deg * -1));
       --tw-skew-y: skewY(calc(6deg * -1));
@@ -3482,55 +4547,50 @@ test('skew', () => {
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-rotate-x: rotateX(0);
-          --tw-rotate-y: rotateY(0);
-          --tw-rotate-z: rotateZ(0);
-          --tw-skew-x: skewX(0);
-          --tw-skew-y: skewY(0);
-        }
-      }
-    }
-
     @property --tw-rotate-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateX(0);
     }
 
     @property --tw-rotate-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateY(0);
     }
 
     @property --tw-rotate-z {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateZ(0);
     }
 
     @property --tw-skew-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewX(0);
     }
 
     @property --tw-skew-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewY(0);
     }"
   `)
-  expect(run(['skew', 'skew-unknown', 'skew-6/foo', '-skew-6/foo', 'skew-[123deg]/foo'])).toEqual(
-    '',
-  )
+  expect(
+    await run([
+      'skew',
+      'skew--1',
+      'skew-unknown',
+      'skew-6/foo',
+      '-skew-6/foo',
+      'skew-[123deg]/foo',
+    ]),
+  ).toEqual('')
 })
 
-test('skew-x', () => {
-  expect(run(['skew-x-6', '-skew-x-6', 'skew-x-[123deg]'])).toMatchInlineSnapshot(`
+test('skew-x', async () => {
+  expect(await run(['skew-x-6', '-skew-x-6', 'skew-x-[123deg]'])).toMatchInlineSnapshot(`
     ".-skew-x-6 {
       --tw-skew-x: skewX(calc(6deg * -1));
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
@@ -3546,55 +4606,50 @@ test('skew-x', () => {
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-rotate-x: rotateX(0);
-          --tw-rotate-y: rotateY(0);
-          --tw-rotate-z: rotateZ(0);
-          --tw-skew-x: skewX(0);
-          --tw-skew-y: skewY(0);
-        }
-      }
-    }
-
     @property --tw-rotate-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateX(0);
     }
 
     @property --tw-rotate-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateY(0);
     }
 
     @property --tw-rotate-z {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateZ(0);
     }
 
     @property --tw-skew-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewX(0);
     }
 
     @property --tw-skew-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewY(0);
     }"
   `)
   expect(
-    run(['skew-x', 'skew-x-unknown', 'skew-x-6/foo', '-skew-x-6/foo', 'skew-x-[123deg]/foo']),
+    await run([
+      'skew-x',
+      'skew-x--1',
+      'skew-x-unknown',
+      'skew-x-6/foo',
+      '-skew-x-6/foo',
+      'skew-x-[123deg]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('skew-y', () => {
-  expect(run(['skew-y-6', '-skew-y-6', 'skew-y-[123deg]'])).toMatchInlineSnapshot(`
+test('skew-y', async () => {
+  expect(await run(['skew-y-6', '-skew-y-6', 'skew-y-[123deg]'])).toMatchInlineSnapshot(`
     ".-skew-y-6 {
       --tw-skew-y: skewY(calc(6deg * -1));
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
@@ -3610,108 +4665,96 @@ test('skew-y', () => {
       transform: var(--tw-rotate-x) var(--tw-rotate-y) var(--tw-rotate-z) var(--tw-skew-x) var(--tw-skew-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-rotate-x: rotateX(0);
-          --tw-rotate-y: rotateY(0);
-          --tw-rotate-z: rotateZ(0);
-          --tw-skew-x: skewX(0);
-          --tw-skew-y: skewY(0);
-        }
-      }
-    }
-
     @property --tw-rotate-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateX(0);
     }
 
     @property --tw-rotate-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateY(0);
     }
 
     @property --tw-rotate-z {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateZ(0);
     }
 
     @property --tw-skew-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewX(0);
     }
 
     @property --tw-skew-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewY(0);
     }"
   `)
   expect(
-    run(['skew-y', 'skew-y-unknown', 'skew-y-6/foo', '-skew-y-6/foo', 'skew-y-[123deg]/foo']),
+    await run([
+      'skew-y',
+      'skew-y--1',
+      'skew-y-unknown',
+      'skew-y-6/foo',
+      '-skew-y-6/foo',
+      'skew-y-[123deg]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('scale', () => {
-  expect(run(['scale-50', '-scale-50', 'scale-[2]', 'scale-[2_1.5_3]'])).toMatchInlineSnapshot(`
-    ".-scale-50 {
-      --tw-scale-x: calc(50% * -1);
-      --tw-scale-y: calc(50% * -1);
-      --tw-scale-z: calc(50% * -1);
-      scale: var(--tw-scale-x) var(--tw-scale-y);
-    }
-
-    .scale-50 {
-      --tw-scale-x: 50%;
-      --tw-scale-y: 50%;
-      --tw-scale-z: 50%;
-      scale: var(--tw-scale-x) var(--tw-scale-y);
-    }
-
-    .scale-\\[2\\] {
-      scale: 2;
-    }
-
-    .scale-\\[2_1\\.5_3\\] {
-      scale: 2 1.5 3;
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scale-x: 1;
-          --tw-scale-y: 1;
-          --tw-scale-z: 1;
-        }
+test('scale', async () => {
+  expect(await run(['scale-50', '-scale-50', 'scale-[2]', 'scale-[2_1.5_3]']))
+    .toMatchInlineSnapshot(`
+      ".-scale-50 {
+        --tw-scale-x: calc(50% * -1);
+        --tw-scale-y: calc(50% * -1);
+        --tw-scale-z: calc(50% * -1);
+        scale: var(--tw-scale-x) var(--tw-scale-y);
       }
-    }
 
-    @property --tw-scale-x {
-      syntax: "<number> | <percentage>";
-      inherits: false;
-      initial-value: 1;
-    }
+      .scale-50 {
+        --tw-scale-x: 50%;
+        --tw-scale-y: 50%;
+        --tw-scale-z: 50%;
+        scale: var(--tw-scale-x) var(--tw-scale-y);
+      }
 
-    @property --tw-scale-y {
-      syntax: "<number> | <percentage>";
-      inherits: false;
-      initial-value: 1;
-    }
+      .scale-\\[2\\] {
+        scale: 2;
+      }
 
-    @property --tw-scale-z {
-      syntax: "<number> | <percentage>";
-      inherits: false;
-      initial-value: 1;
-    }"
-  `)
+      .scale-\\[2_1\\.5_3\\] {
+        scale: 2 1.5 3;
+      }
+
+      @property --tw-scale-x {
+        syntax: "*";
+        inherits: false;
+        initial-value: 1;
+      }
+
+      @property --tw-scale-y {
+        syntax: "*";
+        inherits: false;
+        initial-value: 1;
+      }
+
+      @property --tw-scale-z {
+        syntax: "*";
+        inherits: false;
+        initial-value: 1;
+      }"
+    `)
   expect(
-    run([
+    await run([
       'scale',
+      'scale--50',
+      'scale-1.5',
       'scale-unknown',
       'scale-50/foo',
       '-scale-50/foo',
@@ -3721,45 +4764,35 @@ test('scale', () => {
   ).toEqual('')
 })
 
-test('scale-3d', () => {
-  expect(run(['scale-3d'])).toMatchInlineSnapshot(`
+test('scale-3d', async () => {
+  expect(await run(['scale-3d'])).toMatchInlineSnapshot(`
     ".scale-3d {
       scale: var(--tw-scale-x) var(--tw-scale-y) var(--tw-scale-z);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scale-x: 1;
-          --tw-scale-y: 1;
-          --tw-scale-z: 1;
-        }
-      }
-    }
-
     @property --tw-scale-x {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-y {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-z {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }"
   `)
-  expect(run(['-scale-3d', 'scale-3d/foo'])).toEqual('')
+  expect(await run(['-scale-3d', 'scale-3d/foo'])).toEqual('')
 })
 
-test('scale-x', () => {
-  expect(run(['scale-x-50', '-scale-x-50', 'scale-x-[2]'])).toMatchInlineSnapshot(`
+test('scale-x', async () => {
+  expect(await run(['scale-x-50', '-scale-x-50', 'scale-x-[2]'])).toMatchInlineSnapshot(`
     ".-scale-x-50 {
       --tw-scale-x: calc(50% * -1);
       scale: var(--tw-scale-x) var(--tw-scale-y);
@@ -3775,35 +4808,25 @@ test('scale-x', () => {
       scale: var(--tw-scale-x) var(--tw-scale-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scale-x: 1;
-          --tw-scale-y: 1;
-          --tw-scale-z: 1;
-        }
-      }
-    }
-
     @property --tw-scale-x {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-y {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-z {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }"
   `)
-  expect(run(['scale-200', 'scale-x-400'])).toMatchInlineSnapshot(`
+  expect(await run(['scale-200', 'scale-x-400'])).toMatchInlineSnapshot(`
     ".scale-200 {
       --tw-scale-x: 200%;
       --tw-scale-y: 200%;
@@ -3816,37 +4839,29 @@ test('scale-x', () => {
       scale: var(--tw-scale-x) var(--tw-scale-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scale-x: 1;
-          --tw-scale-y: 1;
-          --tw-scale-z: 1;
-        }
-      }
-    }
-
     @property --tw-scale-x {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-y {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-z {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }"
   `)
   expect(
-    run([
+    await run([
       'scale-x',
+      'scale-x--1',
+      'scale-x-1.5',
       'scale-x-unknown',
       'scale-200/foo',
       'scale-x-400/foo',
@@ -3857,8 +4872,8 @@ test('scale-x', () => {
   ).toEqual('')
 })
 
-test('scale-y', () => {
-  expect(run(['scale-y-50', '-scale-y-50', 'scale-y-[2]'])).toMatchInlineSnapshot(`
+test('scale-y', async () => {
+  expect(await run(['scale-y-50', '-scale-y-50', 'scale-y-[2]'])).toMatchInlineSnapshot(`
     ".-scale-y-50 {
       --tw-scale-y: calc(50% * -1);
       scale: var(--tw-scale-x) var(--tw-scale-y);
@@ -3874,41 +4889,39 @@ test('scale-y', () => {
       scale: var(--tw-scale-x) var(--tw-scale-y);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scale-x: 1;
-          --tw-scale-y: 1;
-          --tw-scale-z: 1;
-        }
-      }
-    }
-
     @property --tw-scale-x {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-y {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-z {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }"
   `)
   expect(
-    run(['scale-y', 'scale-y-unknown', 'scale-y-50/foo', '-scale-y-50/foo', 'scale-y-[2]/foo']),
+    await run([
+      'scale-y',
+      'scale-y--1',
+      'scale-y-1.5',
+      'scale-y-unknown',
+      'scale-y-50/foo',
+      '-scale-y-50/foo',
+      'scale-y-[2]/foo',
+    ]),
   ).toEqual('')
 })
 
-test('scale-z', () => {
-  expect(run(['scale-z-50', '-scale-z-50', 'scale-z-[123deg]'])).toMatchInlineSnapshot(`
+test('scale-z', async () => {
+  expect(await run(['scale-z-50', '-scale-z-50', 'scale-z-[123deg]'])).toMatchInlineSnapshot(`
     ".-scale-z-50 {
       --tw-scale-z: calc(50% * -1);
       scale: var(--tw-scale-x) var(--tw-scale-y) var(--tw-scale-z);
@@ -3924,40 +4937,39 @@ test('scale-z', () => {
       scale: var(--tw-scale-x) var(--tw-scale-y) var(--tw-scale-z);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scale-x: 1;
-          --tw-scale-y: 1;
-          --tw-scale-z: 1;
-        }
-      }
-    }
-
     @property --tw-scale-x {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-y {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }
 
     @property --tw-scale-z {
-      syntax: "<number> | <percentage>";
+      syntax: "*";
       inherits: false;
       initial-value: 1;
     }"
   `)
-  expect(run(['scale-z', 'scale-z-50/foo', '-scale-z-50/foo', 'scale-z-[123deg]/foo'])).toEqual('')
+  expect(
+    await run([
+      'scale-z',
+      'scale-z--1',
+      'scale-z-1.5',
+      'scale-z-50/foo',
+      '-scale-z-50/foo',
+      'scale-z-[123deg]/foo',
+    ]),
+  ).toEqual('')
 })
 
-test('transform', () => {
+test('transform', async () => {
   expect(
-    run([
+    await run([
       'transform',
       'transform-cpu',
       'transform-gpu',
@@ -3985,50 +4997,38 @@ test('transform', () => {
       transform: none;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-rotate-x: rotateX(0);
-          --tw-rotate-y: rotateY(0);
-          --tw-rotate-z: rotateZ(0);
-          --tw-skew-x: skewX(0);
-          --tw-skew-y: skewY(0);
-        }
-      }
-    }
-
     @property --tw-rotate-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateX(0);
     }
 
     @property --tw-rotate-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateY(0);
     }
 
     @property --tw-rotate-z {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: rotateZ(0);
     }
 
     @property --tw-skew-x {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewX(0);
     }
 
     @property --tw-skew-y {
-      syntax: "<transform-function>";
+      syntax: "*";
       inherits: false;
       initial-value: skewY(0);
     }"
   `)
   expect(
-    run([
+    await run([
       'transform-flat',
       'transform-3d',
       'transform-content',
@@ -4077,7 +5077,7 @@ test('transform', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       '-transform',
       '-transform-cpu',
       '-transform-gpu',
@@ -4100,9 +5100,9 @@ test('transform', () => {
   ).toEqual('')
 })
 
-test('perspective', () => {
+test('perspective', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --perspective-dramatic: 100px;
@@ -4123,7 +5123,7 @@ test('perspective', () => {
     }
 
     .perspective-dramatic {
-      perspective: var(--perspective-dramatic, 100px);
+      perspective: var(--perspective-dramatic);
     }
 
     .perspective-none {
@@ -4131,11 +5131,11 @@ test('perspective', () => {
     }
 
     .perspective-normal {
-      perspective: var(--perspective-normal, 500px);
+      perspective: var(--perspective-normal);
     }"
   `)
   expect(
-    run([
+    await run([
       'perspective',
       '-perspective',
       'perspective-potato',
@@ -4148,9 +5148,9 @@ test('perspective', () => {
   ).toEqual('')
 })
 
-test('cursor', () => {
+test('cursor', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --cursor-custom: url(/my-cursor.png);
@@ -4194,7 +5194,7 @@ test('cursor', () => {
         'cursor-nwse-resize',
         'cursor-zoom-in',
         'cursor-zoom-out',
-        'cursor-[--value]',
+        'cursor-[var(--value)]',
         'cursor-custom',
       ],
     ),
@@ -4203,7 +5203,7 @@ test('cursor', () => {
       --cursor-custom: url("/my-cursor.png");
     }
 
-    .cursor-\\[--value\\] {
+    .cursor-\\[var\\(--value\\)\\] {
       cursor: var(--value);
     }
 
@@ -4240,7 +5240,7 @@ test('cursor', () => {
     }
 
     .cursor-custom {
-      cursor: var(--cursor-custom, url("/my-cursor.png"));
+      cursor: var(--cursor-custom);
     }
 
     .cursor-default {
@@ -4356,7 +5356,7 @@ test('cursor', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'cursor',
       '-cursor-auto',
       '-cursor-default',
@@ -4394,7 +5394,7 @@ test('cursor', () => {
       '-cursor-nwse-resize',
       '-cursor-zoom-in',
       '-cursor-zoom-out',
-      '-cursor-[--value]',
+      '-cursor-[var(--value)]',
       '-cursor-custom',
       'cursor-auto/foo',
       'cursor-default/foo',
@@ -4432,14 +5432,14 @@ test('cursor', () => {
       'cursor-nwse-resize/foo',
       'cursor-zoom-in/foo',
       'cursor-zoom-out/foo',
-      'cursor-[--value]/foo',
+      'cursor-[var(--value)]/foo',
       'cursor-custom/foo',
     ]),
   ).toEqual('')
 })
 
-test('touch-action', () => {
-  expect(run(['touch-auto', 'touch-none', 'touch-manipulation'])).toMatchInlineSnapshot(`
+test('touch-action', async () => {
+  expect(await run(['touch-auto', 'touch-none', 'touch-manipulation'])).toMatchInlineSnapshot(`
     ".touch-auto {
       touch-action: auto;
     }
@@ -4453,7 +5453,7 @@ test('touch-action', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-touch-auto',
       '-touch-none',
       '-touch-manipulation',
@@ -4464,9 +5464,9 @@ test('touch-action', () => {
   ).toEqual('')
 })
 
-test('touch-pan', () => {
+test('touch-pan', async () => {
   expect(
-    run([
+    await run([
       'touch-pan-x',
       'touch-pan-left',
       'touch-pan-right',
@@ -4505,16 +5505,6 @@ test('touch-pan', () => {
       touch-action: var(--tw-pan-x, ) var(--tw-pan-y, ) var(--tw-pinch-zoom, );
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-pan-x: initial;
-          --tw-pan-y: initial;
-          --tw-pinch-zoom: initial;
-        }
-      }
-    }
-
     @property --tw-pan-x {
       syntax: "*";
       inherits: false
@@ -4531,7 +5521,7 @@ test('touch-pan', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-touch-pan-x',
       '-touch-pan-left',
       '-touch-pan-right',
@@ -4548,21 +5538,11 @@ test('touch-pan', () => {
   ).toEqual('')
 })
 
-test('touch-pinch-zoom', () => {
-  expect(run(['touch-pinch-zoom'])).toMatchInlineSnapshot(`
+test('touch-pinch-zoom', async () => {
+  expect(await run(['touch-pinch-zoom'])).toMatchInlineSnapshot(`
     ".touch-pinch-zoom {
       --tw-pinch-zoom: pinch-zoom;
       touch-action: var(--tw-pan-x, ) var(--tw-pan-y, ) var(--tw-pinch-zoom, );
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-pan-x: initial;
-          --tw-pan-y: initial;
-          --tw-pinch-zoom: initial;
-        }
-      }
     }
 
     @property --tw-pan-x {
@@ -4580,11 +5560,12 @@ test('touch-pinch-zoom', () => {
       inherits: false
     }"
   `)
-  expect(run(['-touch-pinch-zoom', 'touch-pinch-zoom/foo'])).toEqual('')
+  expect(await run(['-touch-pinch-zoom', 'touch-pinch-zoom/foo'])).toEqual('')
 })
 
-test('select', () => {
-  expect(run(['select-none', 'select-text', 'select-all', 'select-auto'])).toMatchInlineSnapshot(`
+test('select', async () => {
+  expect(await run(['select-none', 'select-text', 'select-all', 'select-auto']))
+    .toMatchInlineSnapshot(`
     ".select-all {
       -webkit-user-select: all;
       user-select: all;
@@ -4606,7 +5587,7 @@ test('select', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-select-none',
       '-select-text',
       '-select-all',
@@ -4619,8 +5600,8 @@ test('select', () => {
   ).toEqual('')
 })
 
-test('resize', () => {
-  expect(run(['resize-none', 'resize', 'resize-x', 'resize-y'])).toMatchInlineSnapshot(`
+test('resize', async () => {
+  expect(await run(['resize-none', 'resize', 'resize-x', 'resize-y'])).toMatchInlineSnapshot(`
     ".resize {
       resize: both;
     }
@@ -4638,7 +5619,7 @@ test('resize', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-resize-none',
       '-resize',
       '-resize-x',
@@ -4651,8 +5632,8 @@ test('resize', () => {
   ).toEqual('')
 })
 
-test('scroll-snap-type', () => {
-  expect(run(['snap-none', 'snap-x', 'snap-y', 'snap-both'])).toMatchInlineSnapshot(`
+test('scroll-snap-type', async () => {
+  expect(await run(['snap-none', 'snap-x', 'snap-y', 'snap-both'])).toMatchInlineSnapshot(`
     ".snap-both {
       scroll-snap-type: both var(--tw-scroll-snap-strictness);
     }
@@ -4669,14 +5650,6 @@ test('scroll-snap-type', () => {
       scroll-snap-type: y var(--tw-scroll-snap-strictness);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scroll-snap-strictness: proximity;
-        }
-      }
-    }
-
     @property --tw-scroll-snap-strictness {
       syntax: "*";
       inherits: false;
@@ -4684,7 +5657,7 @@ test('scroll-snap-type', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-snap-none',
       '-snap-x',
       '-snap-y',
@@ -4697,22 +5670,14 @@ test('scroll-snap-type', () => {
   ).toEqual('')
 })
 
-test('--tw-scroll-snap-strictness', () => {
-  expect(run(['snap-mandatory', 'snap-proximity'])).toMatchInlineSnapshot(`
+test('--tw-scroll-snap-strictness', async () => {
+  expect(await run(['snap-mandatory', 'snap-proximity'])).toMatchInlineSnapshot(`
     ".snap-mandatory {
       --tw-scroll-snap-strictness: mandatory;
     }
 
     .snap-proximity {
       --tw-scroll-snap-strictness: proximity;
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-scroll-snap-strictness: proximity;
-        }
-      }
     }
 
     @property --tw-scroll-snap-strictness {
@@ -4722,12 +5687,13 @@ test('--tw-scroll-snap-strictness', () => {
     }"
   `)
   expect(
-    run(['-snap-mandatory', '-snap-proximity', 'snap-mandatory/foo', 'snap-proximity/foo']),
+    await run(['-snap-mandatory', '-snap-proximity', 'snap-mandatory/foo', 'snap-proximity/foo']),
   ).toEqual('')
 })
 
-test('scroll-snap-align', () => {
-  expect(run(['snap-align-none', 'snap-start', 'snap-end', 'snap-center'])).toMatchInlineSnapshot(`
+test('scroll-snap-align', async () => {
+  expect(await run(['snap-align-none', 'snap-start', 'snap-end', 'snap-center']))
+    .toMatchInlineSnapshot(`
     ".snap-align-none {
       scroll-snap-align: none;
     }
@@ -4745,7 +5711,7 @@ test('scroll-snap-align', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-snap-align-none',
       '-snap-start',
       '-snap-end',
@@ -4758,8 +5724,8 @@ test('scroll-snap-align', () => {
   ).toEqual('')
 })
 
-test('scroll-snap-stop', () => {
-  expect(run(['snap-normal', 'snap-always'])).toMatchInlineSnapshot(`
+test('scroll-snap-stop', async () => {
+  expect(await run(['snap-normal', 'snap-always'])).toMatchInlineSnapshot(`
     ".snap-always {
       scroll-snap-stop: always;
     }
@@ -4768,19 +5734,21 @@ test('scroll-snap-stop', () => {
       scroll-snap-stop: normal;
     }"
   `)
-  expect(run(['-snap-normal', '-snap-always', 'snap-normal/foo', 'snap-always/foo'])).toEqual('')
+  expect(await run(['-snap-normal', '-snap-always', 'snap-normal/foo', 'snap-always/foo'])).toEqual(
+    '',
+  )
 })
 
-test('scroll-m', () => {
+test('scroll-m', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-m-4', 'scroll-m-[4px]', '-scroll-m-4', '-scroll-m-[--value]'],
+      ['scroll-m-4', 'scroll-m-[4px]', '-scroll-m-4', '-scroll-m-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -4788,15 +5756,15 @@ test('scroll-m', () => {
     }
 
     .-scroll-m-4 {
-      scroll-margin: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-m-\\[--value\\] {
+    .-scroll-m-\\[var\\(--value\\)\\] {
       scroll-margin: calc(var(--value) * -1);
     }
 
     .scroll-m-4 {
-      scroll-margin: var(--spacing-4, 1rem);
+      scroll-margin: var(--spacing-4);
     }
 
     .scroll-m-\\[4px\\] {
@@ -4804,26 +5772,26 @@ test('scroll-m', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-m',
       'scroll-m-4/foo',
       'scroll-m-[4px]/foo',
       '-scroll-m-4/foo',
-      '-scroll-m-[--value]/foo',
+      '-scroll-m-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-mx', () => {
+test('scroll-mx', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-mx-4', 'scroll-mx-[4px]', '-scroll-mx-4', '-scroll-mx-[--value]'],
+      ['scroll-mx-4', 'scroll-mx-[4px]', '-scroll-mx-4', '-scroll-mx-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -4831,46 +5799,42 @@ test('scroll-mx', () => {
     }
 
     .-scroll-mx-4 {
-      scroll-margin-left: calc(var(--spacing-4, 1rem) * -1);
-      scroll-margin-right: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-inline: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-mx-\\[--value\\] {
-      scroll-margin-left: calc(var(--value) * -1);
-      scroll-margin-right: calc(var(--value) * -1);
+    .-scroll-mx-\\[var\\(--value\\)\\] {
+      scroll-margin-inline: calc(var(--value) * -1);
     }
 
     .scroll-mx-4 {
-      scroll-margin-left: var(--spacing-4, 1rem);
-      scroll-margin-right: var(--spacing-4, 1rem);
+      scroll-margin-inline: var(--spacing-4);
     }
 
     .scroll-mx-\\[4px\\] {
-      scroll-margin-left: 4px;
-      scroll-margin-right: 4px;
+      scroll-margin-inline: 4px;
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-mx',
       'scroll-mx-4/foo',
       'scroll-mx-[4px]/foo',
       '-scroll-mx-4/foo',
-      '-scroll-mx-[--value]/foo',
+      '-scroll-mx-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-my', () => {
+test('scroll-my', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-my-4', 'scroll-my-[4px]', '-scroll-my-4', '-scroll-my-[--value]'],
+      ['scroll-my-4', 'scroll-my-[4px]', '-scroll-my-4', '-scroll-my-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -4878,46 +5842,42 @@ test('scroll-my', () => {
     }
 
     .-scroll-my-4 {
-      scroll-margin-top: calc(var(--spacing-4, 1rem) * -1);
-      scroll-margin-bottom: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-block: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-my-\\[--value\\] {
-      scroll-margin-top: calc(var(--value) * -1);
-      scroll-margin-bottom: calc(var(--value) * -1);
+    .-scroll-my-\\[var\\(--value\\)\\] {
+      scroll-margin-block: calc(var(--value) * -1);
     }
 
     .scroll-my-4 {
-      scroll-margin-top: var(--spacing-4, 1rem);
-      scroll-margin-bottom: var(--spacing-4, 1rem);
+      scroll-margin-block: var(--spacing-4);
     }
 
     .scroll-my-\\[4px\\] {
-      scroll-margin-top: 4px;
-      scroll-margin-bottom: 4px;
+      scroll-margin-block: 4px;
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-my',
       'scroll-my-4/foo',
       'scroll-my-[4px]/foo',
       '-scroll-my-4/foo',
-      '-scroll-my-[--value]/foo',
+      '-scroll-my-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-ms', () => {
+test('scroll-ms', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-ms-4', 'scroll-ms-[4px]', '-scroll-ms-4', '-scroll-ms-[--value]'],
+      ['scroll-ms-4', 'scroll-ms-[4px]', '-scroll-ms-4', '-scroll-ms-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -4925,15 +5885,15 @@ test('scroll-ms', () => {
     }
 
     .-scroll-ms-4 {
-      scroll-margin-inline-start: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-inline-start: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-ms-\\[--value\\] {
+    .-scroll-ms-\\[var\\(--value\\)\\] {
       scroll-margin-inline-start: calc(var(--value) * -1);
     }
 
     .scroll-ms-4 {
-      scroll-margin-inline-start: var(--spacing-4, 1rem);
+      scroll-margin-inline-start: var(--spacing-4);
     }
 
     .scroll-ms-\\[4px\\] {
@@ -4941,26 +5901,26 @@ test('scroll-ms', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-ms',
       'scroll-ms-4/foo',
       'scroll-ms-[4px]/foo',
       '-scroll-ms-4/foo',
-      '-scroll-ms-[--value]/foo',
+      '-scroll-ms-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-me', () => {
+test('scroll-me', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-me-4', 'scroll-me-[4px]', '-scroll-me-4', '-scroll-me-[--value]'],
+      ['scroll-me-4', 'scroll-me-[4px]', '-scroll-me-4', '-scroll-me-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -4968,15 +5928,15 @@ test('scroll-me', () => {
     }
 
     .-scroll-me-4 {
-      scroll-margin-inline-end: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-inline-end: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-me-\\[--value\\] {
+    .-scroll-me-\\[var\\(--value\\)\\] {
       scroll-margin-inline-end: calc(var(--value) * -1);
     }
 
     .scroll-me-4 {
-      scroll-margin-inline-end: var(--spacing-4, 1rem);
+      scroll-margin-inline-end: var(--spacing-4);
     }
 
     .scroll-me-\\[4px\\] {
@@ -4984,26 +5944,26 @@ test('scroll-me', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-me',
       'scroll-me-4/foo',
       'scroll-me-[4px]/foo',
       '-scroll-me-4/foo',
-      '-scroll-me-[--value]/foo',
+      '-scroll-me-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-mt', () => {
+test('scroll-mt', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-mt-4', 'scroll-mt-[4px]', '-scroll-mt-4', '-scroll-mt-[--value]'],
+      ['scroll-mt-4', 'scroll-mt-[4px]', '-scroll-mt-4', '-scroll-mt-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -5011,15 +5971,15 @@ test('scroll-mt', () => {
     }
 
     .-scroll-mt-4 {
-      scroll-margin-top: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-top: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-mt-\\[--value\\] {
+    .-scroll-mt-\\[var\\(--value\\)\\] {
       scroll-margin-top: calc(var(--value) * -1);
     }
 
     .scroll-mt-4 {
-      scroll-margin-top: var(--spacing-4, 1rem);
+      scroll-margin-top: var(--spacing-4);
     }
 
     .scroll-mt-\\[4px\\] {
@@ -5027,26 +5987,26 @@ test('scroll-mt', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-mt',
       'scroll-mt-4/foo',
       'scroll-mt-[4px]/foo',
       '-scroll-mt-4/foo',
-      '-scroll-mt-[--value]/foo',
+      '-scroll-mt-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-mr', () => {
+test('scroll-mr', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-mr-4', 'scroll-mr-[4px]', '-scroll-mr-4', '-scroll-mr-[--value]'],
+      ['scroll-mr-4', 'scroll-mr-[4px]', '-scroll-mr-4', '-scroll-mr-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -5054,15 +6014,15 @@ test('scroll-mr', () => {
     }
 
     .-scroll-mr-4 {
-      scroll-margin-right: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-right: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-mr-\\[--value\\] {
+    .-scroll-mr-\\[var\\(--value\\)\\] {
       scroll-margin-right: calc(var(--value) * -1);
     }
 
     .scroll-mr-4 {
-      scroll-margin-right: var(--spacing-4, 1rem);
+      scroll-margin-right: var(--spacing-4);
     }
 
     .scroll-mr-\\[4px\\] {
@@ -5070,26 +6030,26 @@ test('scroll-mr', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-mr',
       'scroll-mr-4/foo',
       'scroll-mr-[4px]/foo',
       '-scroll-mr-4/foo',
-      '-scroll-mr-[--value]/foo',
+      '-scroll-mr-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-mb', () => {
+test('scroll-mb', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-mb-4', 'scroll-mb-[4px]', '-scroll-mb-4', '-scroll-mb-[--value]'],
+      ['scroll-mb-4', 'scroll-mb-[4px]', '-scroll-mb-4', '-scroll-mb-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -5097,15 +6057,15 @@ test('scroll-mb', () => {
     }
 
     .-scroll-mb-4 {
-      scroll-margin-bottom: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-bottom: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-mb-\\[--value\\] {
+    .-scroll-mb-\\[var\\(--value\\)\\] {
       scroll-margin-bottom: calc(var(--value) * -1);
     }
 
     .scroll-mb-4 {
-      scroll-margin-bottom: var(--spacing-4, 1rem);
+      scroll-margin-bottom: var(--spacing-4);
     }
 
     .scroll-mb-\\[4px\\] {
@@ -5113,26 +6073,26 @@ test('scroll-mb', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-mb',
       'scroll-mb-4/foo',
       'scroll-mb-[4px]/foo',
       '-scroll-mb-4/foo',
-      '-scroll-mb-[--value]/foo',
+      '-scroll-mb-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-ml', () => {
+test('scroll-ml', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-ml-4', 'scroll-ml-[4px]', '-scroll-ml-4', '-scroll-ml-[--value]'],
+      ['scroll-ml-4', 'scroll-ml-[4px]', '-scroll-ml-4', '-scroll-ml-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
@@ -5140,15 +6100,15 @@ test('scroll-ml', () => {
     }
 
     .-scroll-ml-4 {
-      scroll-margin-left: calc(var(--spacing-4, 1rem) * -1);
+      scroll-margin-left: calc(var(--spacing-4) * -1);
     }
 
-    .-scroll-ml-\\[--value\\] {
+    .-scroll-ml-\\[var\\(--value\\)\\] {
       scroll-margin-left: calc(var(--value) * -1);
     }
 
     .scroll-ml-4 {
-      scroll-margin-left: var(--spacing-4, 1rem);
+      scroll-margin-left: var(--spacing-4);
     }
 
     .scroll-ml-\\[4px\\] {
@@ -5156,42 +6116,34 @@ test('scroll-ml', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-ml',
       'scroll-ml-4/foo',
       'scroll-ml-[4px]/foo',
       '-scroll-ml-4/foo',
-      '-scroll-ml-[--value]/foo',
+      '-scroll-ml-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-p', () => {
+test('scroll-p', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-p-4', 'scroll-p-[4px]', '-scroll-p-4', '-scroll-p-[--value]'],
+      ['scroll-p-4', 'scroll-p-[4px]', '-scroll-p-4', '-scroll-p-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-p-4 {
-      scroll-padding: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-p-\\[--value\\] {
-      scroll-padding: calc(var(--value) * -1);
-    }
-
     .scroll-p-4 {
-      scroll-padding: var(--spacing-4, 1rem);
+      scroll-padding: var(--spacing-4);
     }
 
     .scroll-p-\\[4px\\] {
@@ -5199,136 +6151,104 @@ test('scroll-p', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-p',
       'scroll-p-4/foo',
       'scroll-p-[4px]/foo',
       '-scroll-p-4/foo',
-      '-scroll-p-[--value]/foo',
+      '-scroll-p-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-px', () => {
+test('scroll-px', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-px-4', 'scroll-px-[4px]', '-scroll-px-4', '-scroll-px-[--value]'],
+      ['scroll-px-4', 'scroll-px-[4px]', '-scroll-px-4', '-scroll-px-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-px-4 {
-      scroll-padding-left: calc(var(--spacing-4, 1rem) * -1);
-      scroll-padding-right: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-px-\\[--value\\] {
-      scroll-padding-left: calc(var(--value) * -1);
-      scroll-padding-right: calc(var(--value) * -1);
-    }
-
     .scroll-px-4 {
-      scroll-padding-left: var(--spacing-4, 1rem);
-      scroll-padding-right: var(--spacing-4, 1rem);
+      scroll-padding-inline: var(--spacing-4);
     }
 
     .scroll-px-\\[4px\\] {
-      scroll-padding-left: 4px;
-      scroll-padding-right: 4px;
+      scroll-padding-inline: 4px;
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-px',
       'scroll-px-4/foo',
       'scroll-px-[4px]/foo',
       '-scroll-px-4/foo',
-      '-scroll-px-[--value]/foo',
+      '-scroll-px-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-py', () => {
+test('scroll-py', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-py-4', 'scroll-py-[4px]', '-scroll-py-4', '-scroll-py-[--value]'],
+      ['scroll-py-4', 'scroll-py-[4px]', '-scroll-py-4', '-scroll-py-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-py-4 {
-      scroll-padding-top: calc(var(--spacing-4, 1rem) * -1);
-      scroll-padding-bottom: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-py-\\[--value\\] {
-      scroll-padding-top: calc(var(--value) * -1);
-      scroll-padding-bottom: calc(var(--value) * -1);
-    }
-
     .scroll-py-4 {
-      scroll-padding-top: var(--spacing-4, 1rem);
-      scroll-padding-bottom: var(--spacing-4, 1rem);
+      scroll-padding-block: var(--spacing-4);
     }
 
     .scroll-py-\\[4px\\] {
-      scroll-padding-top: 4px;
-      scroll-padding-bottom: 4px;
+      scroll-padding-block: 4px;
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-py',
       'scroll-py-4/foo',
       'scroll-py-[4px]/foo',
       '-scroll-py-4/foo',
-      '-scroll-py-[--value]/foo',
+      '-scroll-py-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-ps', () => {
+test('scroll-ps', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-ps-4', 'scroll-ps-[4px]', '-scroll-ps-4', '-scroll-ps-[--value]'],
+      ['scroll-ps-4', 'scroll-ps-[4px]', '-scroll-ps-4', '-scroll-ps-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-ps-4 {
-      scroll-padding-inline-start: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-ps-\\[--value\\] {
-      scroll-padding-inline-start: calc(var(--value) * -1);
-    }
-
     .scroll-ps-4 {
-      scroll-padding-inline-start: var(--spacing-4, 1rem);
+      scroll-padding-inline-start: var(--spacing-4);
     }
 
     .scroll-ps-\\[4px\\] {
@@ -5336,42 +6256,34 @@ test('scroll-ps', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-ps',
       'scroll-ps-4/foo',
       'scroll-ps-[4px]/foo',
       '-scroll-ps-4/foo',
-      '-scroll-ps-[--value]/foo',
+      '-scroll-ps-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-pe', () => {
+test('scroll-pe', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-pe-4', 'scroll-pe-[4px]', '-scroll-pe-4', '-scroll-pe-[--value]'],
+      ['scroll-pe-4', 'scroll-pe-[4px]', '-scroll-pe-4', '-scroll-pe-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-pe-4 {
-      scroll-padding-inline-end: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-pe-\\[--value\\] {
-      scroll-padding-inline-end: calc(var(--value) * -1);
-    }
-
     .scroll-pe-4 {
-      scroll-padding-inline-end: var(--spacing-4, 1rem);
+      scroll-padding-inline-end: var(--spacing-4);
     }
 
     .scroll-pe-\\[4px\\] {
@@ -5379,42 +6291,34 @@ test('scroll-pe', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-pe',
       'scroll-pe-4/foo',
       'scroll-pe-[4px]/foo',
       '-scroll-pe-4/foo',
-      '-scroll-pe-[--value]/foo',
+      '-scroll-pe-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-pt', () => {
+test('scroll-pt', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-pt-4', 'scroll-pt-[4px]', '-scroll-pt-4', '-scroll-pt-[--value]'],
+      ['scroll-pt-4', 'scroll-pt-[4px]', '-scroll-pt-4', '-scroll-pt-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-pt-4 {
-      scroll-padding-top: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-pt-\\[--value\\] {
-      scroll-padding-top: calc(var(--value) * -1);
-    }
-
     .scroll-pt-4 {
-      scroll-padding-top: var(--spacing-4, 1rem);
+      scroll-padding-top: var(--spacing-4);
     }
 
     .scroll-pt-\\[4px\\] {
@@ -5422,42 +6326,34 @@ test('scroll-pt', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-pt',
       'scroll-pt-4/foo',
       'scroll-pt-[4px]/foo',
       '-scroll-pt-4/foo',
-      '-scroll-pt-[--value]/foo',
+      '-scroll-pt-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-pr', () => {
+test('scroll-pr', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-pr-4', 'scroll-pr-[4px]', '-scroll-pr-4', '-scroll-pr-[--value]'],
+      ['scroll-pr-4', 'scroll-pr-[4px]', '-scroll-pr-4', '-scroll-pr-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-pr-4 {
-      scroll-padding-right: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-pr-\\[--value\\] {
-      scroll-padding-right: calc(var(--value) * -1);
-    }
-
     .scroll-pr-4 {
-      scroll-padding-right: var(--spacing-4, 1rem);
+      scroll-padding-right: var(--spacing-4);
     }
 
     .scroll-pr-\\[4px\\] {
@@ -5465,42 +6361,34 @@ test('scroll-pr', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-pr',
       'scroll-pr-4/foo',
       'scroll-pr-[4px]/foo',
       '-scroll-pr-4/foo',
-      '-scroll-pr-[--value]/foo',
+      '-scroll-pr-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-pb', () => {
+test('scroll-pb', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-pb-4', 'scroll-pb-[4px]', '-scroll-pb-4', '-scroll-pb-[--value]'],
+      ['scroll-pb-4', 'scroll-pb-[4px]', '-scroll-pb-4', '-scroll-pb-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-pb-4 {
-      scroll-padding-bottom: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-pb-\\[--value\\] {
-      scroll-padding-bottom: calc(var(--value) * -1);
-    }
-
     .scroll-pb-4 {
-      scroll-padding-bottom: var(--spacing-4, 1rem);
+      scroll-padding-bottom: var(--spacing-4);
     }
 
     .scroll-pb-\\[4px\\] {
@@ -5508,42 +6396,34 @@ test('scroll-pb', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-pb',
       'scroll-pb-4/foo',
       'scroll-pb-[4px]/foo',
       '-scroll-pb-4/foo',
-      '-scroll-pb-[--value]/foo',
+      '-scroll-pb-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('scroll-pl', () => {
+test('scroll-pl', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
         }
         @tailwind utilities;
       `,
-      ['scroll-pl-4', 'scroll-pl-[4px]', '-scroll-pl-4', '-scroll-pl-[--value]'],
+      ['scroll-pl-4', 'scroll-pl-[4px]', '-scroll-pl-4', '-scroll-pl-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --spacing-4: 1rem;
     }
 
-    .-scroll-pl-4 {
-      scroll-padding-left: calc(var(--spacing-4, 1rem) * -1);
-    }
-
-    .-scroll-pl-\\[--value\\] {
-      scroll-padding-left: calc(var(--value) * -1);
-    }
-
     .scroll-pl-4 {
-      scroll-padding-left: var(--spacing-4, 1rem);
+      scroll-padding-left: var(--spacing-4);
     }
 
     .scroll-pl-\\[4px\\] {
@@ -5551,18 +6431,18 @@ test('scroll-pl', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'scroll-pl',
       'scroll-pl-4/foo',
       'scroll-pl-[4px]/foo',
       '-scroll-pl-4/foo',
-      '-scroll-pl-[--value]/foo',
+      '-scroll-pl-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('list-style-position', () => {
-  expect(run(['list-inside', 'list-outside'])).toMatchInlineSnapshot(`
+test('list-style-position', async () => {
+  expect(await run(['list-inside', 'list-outside'])).toMatchInlineSnapshot(`
     ".list-inside {
       list-style-position: inside;
     }
@@ -5571,44 +6451,47 @@ test('list-style-position', () => {
       list-style-position: outside;
     }"
   `)
-  expect(run(['-list-inside', '-list-outside', 'list-inside/foo', 'list-outside/foo'])).toEqual('')
+  expect(
+    await run(['-list-inside', '-list-outside', 'list-inside/foo', 'list-outside/foo']),
+  ).toEqual('')
 })
 
-test('list', () => {
-  expect(run(['list-none', 'list-disc', 'list-decimal', 'list-[--value]'])).toMatchInlineSnapshot(`
-    ".list-\\[--value\\] {
-      list-style-type: var(--value);
-    }
+test('list', async () => {
+  expect(await run(['list-none', 'list-disc', 'list-decimal', 'list-[var(--value)]']))
+    .toMatchInlineSnapshot(`
+      ".list-\\[var\\(--value\\)\\] {
+        list-style-type: var(--value);
+      }
 
-    .list-decimal {
-      list-style-type: decimal;
-    }
+      .list-decimal {
+        list-style-type: decimal;
+      }
 
-    .list-disc {
-      list-style-type: disc;
-    }
+      .list-disc {
+        list-style-type: disc;
+      }
 
-    .list-none {
-      list-style-type: none;
-    }"
-  `)
+      .list-none {
+        list-style-type: none;
+      }"
+    `)
   expect(
-    run([
+    await run([
       '-list-none',
       '-list-disc',
       '-list-decimal',
-      '-list-[--value]',
+      '-list-[var(--value)]',
       'list-none/foo',
       'list-disc/foo',
       'list-decimal/foo',
-      'list-[--value]/foo',
+      'list-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('list-image', () => {
-  expect(run(['list-image-none', 'list-image-[--value]'])).toMatchInlineSnapshot(`
-    ".list-image-\\[--value\\] {
+test('list-image', async () => {
+  expect(await run(['list-image-none', 'list-image-[var(--value)]'])).toMatchInlineSnapshot(`
+    ".list-image-\\[var\\(--value\\)\\] {
       list-style-image: var(--value);
     }
 
@@ -5617,18 +6500,18 @@ test('list-image', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'list-image',
       '-list-image-none',
-      '-list-image-[--value]',
+      '-list-image-[var(--value)]',
       'list-image-none/foo',
-      'list-image-[--value]/foo',
+      'list-image-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('appearance', () => {
-  expect(run(['appearance-none', 'appearance-auto'])).toMatchInlineSnapshot(`
+test('appearance', async () => {
+  expect(await run(['appearance-none', 'appearance-auto'])).toMatchInlineSnapshot(`
     ".appearance-auto {
       appearance: auto;
     }
@@ -5638,7 +6521,7 @@ test('appearance', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'appearance',
       '-appearance-none',
       '-appearance-auto',
@@ -5648,13 +6531,60 @@ test('appearance', () => {
   ).toEqual('')
 })
 
-test('columns', () => {
+test('color-scheme', async () => {
   expect(
-    compileCss(
+    await run([
+      'scheme-normal',
+      'scheme-dark',
+      'scheme-light',
+      'scheme-light-dark',
+      'scheme-only-dark',
+      'scheme-only-light',
+    ]),
+  ).toMatchInlineSnapshot(`
+    ".scheme-dark {
+      color-scheme: dark;
+    }
+
+    .scheme-light {
+      color-scheme: light;
+    }
+
+    .scheme-light-dark {
+      color-scheme: light dark;
+    }
+
+    .scheme-normal {
+      color-scheme: normal;
+    }
+
+    .scheme-only-dark {
+      color-scheme: dark only;
+    }
+
+    .scheme-only-light {
+      color-scheme: light only;
+    }"
+  `)
+  expect(
+    await run([
+      'scheme',
+      '-scheme-dark',
+      '-scheme-light',
+      '-scheme-light-dark',
+      '-scheme-dark-only',
+      '-scheme-light-only',
+    ]),
+  ).toEqual('')
+})
+
+test('columns', async () => {
+  expect(
+    await compileCss(
       css`
         @theme {
-          --width-3xs: 16rem;
-          --width-7xl: 80rem;
+          --container-3xs: 16rem;
+          --container-7xl: 80rem;
         }
         @tailwind utilities;
       `,
@@ -5665,17 +6595,17 @@ test('columns', () => {
         'columns-4',
         'columns-99',
         'columns-[123]',
-        'columns-[--value]',
+        'columns-[var(--value)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --width-3xs: 16rem;
-      --width-7xl: 80rem;
+      --container-3xs: 16rem;
+      --container-7xl: 80rem;
     }
 
     .columns-3xs {
-      columns: var(--width-3xs, 16rem);
+      columns: var(--container-3xs);
     }
 
     .columns-4 {
@@ -5683,19 +6613,19 @@ test('columns', () => {
     }
 
     .columns-7xl {
-      columns: var(--width-7xl, 80rem);
+      columns: var(--container-7xl);
     }
 
     .columns-99 {
       columns: 99;
     }
 
-    .columns-\\[--value\\] {
-      columns: var(--value);
-    }
-
     .columns-\\[123\\] {
       columns: 123;
+    }
+
+    .columns-\\[var\\(--value\\)\\] {
+      columns: var(--value);
     }
 
     .columns-auto {
@@ -5703,11 +6633,12 @@ test('columns', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'columns',
+      'columns--4',
       '-columns-4',
       '-columns-[123]',
-      '-columns-[--value]',
+      '-columns-[var(--value)]',
       'columns-unknown',
       'columns-auto/foo',
       'columns-3xs/foo',
@@ -5715,14 +6646,14 @@ test('columns', () => {
       'columns-4/foo',
       'columns-99/foo',
       'columns-[123]/foo',
-      'columns-[--value]/foo',
+      'columns-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('break-before', () => {
+test('break-before', async () => {
   expect(
-    run([
+    await run([
       'break-before-auto',
       'break-before-avoid',
       'break-before-all',
@@ -5766,7 +6697,7 @@ test('break-before', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'break-before',
       '-break-before-auto',
       '-break-before-avoid',
@@ -5788,9 +6719,9 @@ test('break-before', () => {
   ).toEqual('')
 })
 
-test('break-inside', () => {
+test('break-inside', async () => {
   expect(
-    run([
+    await run([
       'break-inside-auto',
       'break-inside-avoid',
       'break-inside-avoid-page',
@@ -5814,7 +6745,7 @@ test('break-inside', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'break-inside',
       '-break-inside-auto',
       '-break-inside-avoid',
@@ -5828,9 +6759,9 @@ test('break-inside', () => {
   ).toEqual('')
 })
 
-test('break-after', () => {
+test('break-after', async () => {
   expect(
-    run([
+    await run([
       'break-after-auto',
       'break-after-avoid',
       'break-after-all',
@@ -5874,7 +6805,7 @@ test('break-after', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'break-after',
       '-break-after-auto',
       '-break-after-avoid',
@@ -5896,9 +6827,15 @@ test('break-after', () => {
   ).toEqual('')
 })
 
-test('auto-cols', () => {
+test('auto-cols', async () => {
   expect(
-    run(['auto-cols-auto', 'auto-cols-min', 'auto-cols-max', 'auto-cols-fr', 'auto-cols-[2fr]']),
+    await run([
+      'auto-cols-auto',
+      'auto-cols-min',
+      'auto-cols-max',
+      'auto-cols-fr',
+      'auto-cols-[2fr]',
+    ]),
   ).toMatchInlineSnapshot(`
     ".auto-cols-\\[2fr\\] {
       grid-auto-columns: 2fr;
@@ -5921,7 +6858,7 @@ test('auto-cols', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'auto-cols',
       '-auto-cols-auto',
       '-auto-cols-[2fr]',
@@ -5934,9 +6871,9 @@ test('auto-cols', () => {
   ).toEqual('')
 })
 
-test('grid-flow', () => {
+test('grid-flow', async () => {
   expect(
-    run([
+    await run([
       'grid-flow-row',
       'grid-flow-col',
       'grid-flow-dense',
@@ -5965,7 +6902,7 @@ test('grid-flow', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'grid-flow',
       '-grid-flow-row',
       '-grid-flow-col',
@@ -5981,9 +6918,15 @@ test('grid-flow', () => {
   ).toEqual('')
 })
 
-test('auto-rows', () => {
+test('auto-rows', async () => {
   expect(
-    run(['auto-rows-auto', 'auto-rows-min', 'auto-rows-max', 'auto-rows-fr', 'auto-rows-[2fr]']),
+    await run([
+      'auto-rows-auto',
+      'auto-rows-min',
+      'auto-rows-max',
+      'auto-rows-fr',
+      'auto-rows-[2fr]',
+    ]),
   ).toMatchInlineSnapshot(`
     ".auto-rows-\\[2fr\\] {
       grid-auto-rows: 2fr;
@@ -6006,7 +6949,7 @@ test('auto-rows', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'auto-rows',
       '-auto-rows-auto',
       '-auto-rows-[2fr]',
@@ -6019,9 +6962,15 @@ test('auto-rows', () => {
   ).toEqual('')
 })
 
-test('grid-cols', () => {
+test('grid-cols', async () => {
   expect(
-    run(['grid-cols-none', 'grid-cols-subgrid', 'grid-cols-12', 'grid-cols-99', 'grid-cols-[123]']),
+    await run([
+      'grid-cols-none',
+      'grid-cols-subgrid',
+      'grid-cols-12',
+      'grid-cols-99',
+      'grid-cols-[123]',
+    ]),
   ).toMatchInlineSnapshot(`
     ".grid-cols-12 {
       grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -6044,10 +6993,11 @@ test('grid-cols', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'grid-cols',
       '-grid-cols-none',
       '-grid-cols-subgrid',
+      'grid-cols--12',
       '-grid-cols-12',
       '-grid-cols-[123]',
       'grid-cols-unknown',
@@ -6060,9 +7010,15 @@ test('grid-cols', () => {
   ).toEqual('')
 })
 
-test('grid-rows', () => {
+test('grid-rows', async () => {
   expect(
-    run(['grid-rows-none', 'grid-rows-subgrid', 'grid-rows-12', 'grid-rows-99', 'grid-rows-[123]']),
+    await run([
+      'grid-rows-none',
+      'grid-rows-subgrid',
+      'grid-rows-12',
+      'grid-rows-99',
+      'grid-rows-[123]',
+    ]),
   ).toMatchInlineSnapshot(`
     ".grid-rows-12 {
       grid-template-rows: repeat(12, minmax(0, 1fr));
@@ -6085,10 +7041,11 @@ test('grid-rows', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'grid-rows',
       '-grid-rows-none',
       '-grid-rows-subgrid',
+      'grid-rows--12',
       '-grid-rows-12',
       '-grid-rows-[123]',
       'grid-rows-unknown',
@@ -6101,8 +7058,8 @@ test('grid-rows', () => {
   ).toEqual('')
 })
 
-test('flex-direction', () => {
-  expect(run(['flex-row', 'flex-row-reverse', 'flex-col', 'flex-col-reverse']))
+test('flex-direction', async () => {
+  expect(await run(['flex-row', 'flex-row-reverse', 'flex-col', 'flex-col-reverse']))
     .toMatchInlineSnapshot(`
     ".flex-col {
       flex-direction: column;
@@ -6121,7 +7078,7 @@ test('flex-direction', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-flex-row',
       '-flex-row-reverse',
       '-flex-col',
@@ -6134,8 +7091,8 @@ test('flex-direction', () => {
   ).toEqual('')
 })
 
-test('flex-wrap', () => {
-  expect(run(['flex-wrap', 'flex-wrap-reverse', 'flex-nowrap'])).toMatchInlineSnapshot(`
+test('flex-wrap', async () => {
+  expect(await run(['flex-wrap', 'flex-wrap-reverse', 'flex-nowrap'])).toMatchInlineSnapshot(`
     ".flex-nowrap {
       flex-wrap: nowrap;
     }
@@ -6149,7 +7106,7 @@ test('flex-wrap', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-flex-wrap',
       '-flex-wrap-reverse',
       '-flex-nowrap',
@@ -6160,9 +7117,9 @@ test('flex-wrap', () => {
   ).toEqual('')
 })
 
-test('place-content', () => {
+test('place-content', async () => {
   expect(
-    run([
+    await run([
       'place-content-center',
       'place-content-start',
       'place-content-end',
@@ -6174,7 +7131,7 @@ test('place-content', () => {
     ]),
   ).toMatchInlineSnapshot(`
     ".place-content-around {
-      place-content: around;
+      place-content: space-around;
     }
 
     .place-content-baseline {
@@ -6182,7 +7139,7 @@ test('place-content', () => {
     }
 
     .place-content-between {
-      place-content: between;
+      place-content: space-between;
     }
 
     .place-content-center {
@@ -6194,7 +7151,7 @@ test('place-content', () => {
     }
 
     .place-content-evenly {
-      place-content: evenly;
+      place-content: space-evenly;
     }
 
     .place-content-start {
@@ -6206,7 +7163,7 @@ test('place-content', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'place-content',
       '-place-content-center',
       '-place-content-start',
@@ -6228,9 +7185,9 @@ test('place-content', () => {
   ).toEqual('')
 })
 
-test('place-items', () => {
+test('place-items', async () => {
   expect(
-    run([
+    await run([
       'place-items-start',
       'place-items-end',
       'place-items-center',
@@ -6259,7 +7216,7 @@ test('place-items', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'place-items',
       '-place-items-start',
       '-place-items-end',
@@ -6275,9 +7232,9 @@ test('place-items', () => {
   ).toEqual('')
 })
 
-test('align-content', () => {
+test('align-content', async () => {
   expect(
-    run([
+    await run([
       'content-normal',
       'content-center',
       'content-start',
@@ -6326,7 +7283,7 @@ test('align-content', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'content',
       '-content-normal',
       '-content-center',
@@ -6350,8 +7307,8 @@ test('align-content', () => {
   ).toEqual('')
 })
 
-test('items', () => {
-  expect(run(['items-start', 'items-end', 'items-center', 'items-baseline', 'items-stretch']))
+test('items', async () => {
+  expect(await run(['items-start', 'items-end', 'items-center', 'items-baseline', 'items-stretch']))
     .toMatchInlineSnapshot(`
     ".items-baseline {
       align-items: baseline;
@@ -6374,7 +7331,7 @@ test('items', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'items',
       '-items-start',
       '-items-end',
@@ -6390,9 +7347,9 @@ test('items', () => {
   ).toEqual('')
 })
 
-test('justify', () => {
+test('justify', async () => {
   expect(
-    run([
+    await run([
       'justify-normal',
       'justify-start',
       'justify-end',
@@ -6436,7 +7393,7 @@ test('justify', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'justify',
       '-justify-normal',
       '-justify-start',
@@ -6458,9 +7415,9 @@ test('justify', () => {
   ).toEqual('')
 })
 
-test('justify-items', () => {
+test('justify-items', async () => {
   expect(
-    run([
+    await run([
       'justify-items-start',
       'justify-items-end',
       'justify-items-center',
@@ -6484,7 +7441,7 @@ test('justify-items', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'justify-items',
       '-justify-items-start',
       '-justify-items-end',
@@ -6498,9 +7455,9 @@ test('justify-items', () => {
   ).toEqual('')
 })
 
-test('gap', () => {
+test('gap', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -6515,19 +7472,19 @@ test('gap', () => {
     }
 
     .gap-4 {
-      gap: var(--spacing-4, 1rem);
+      gap: var(--spacing-4);
     }
 
     .gap-\\[4px\\] {
       gap: 4px;
     }"
   `)
-  expect(run(['gap', '-gap-4', '-gap-[4px]', 'gap-4/foo', 'gap-[4px]/foo'])).toEqual('')
+  expect(await run(['gap', '-gap-4', '-gap-[4px]', 'gap-4/foo', 'gap-[4px]/foo'])).toEqual('')
 })
 
-test('gap-x', () => {
+test('gap-x', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -6542,19 +7499,21 @@ test('gap-x', () => {
     }
 
     .gap-x-4 {
-      column-gap: var(--spacing-4, 1rem);
+      column-gap: var(--spacing-4);
     }
 
     .gap-x-\\[4px\\] {
       column-gap: 4px;
     }"
   `)
-  expect(run(['gap-x', '-gap-x-4', '-gap-x-[4px]', 'gap-x-4/foo', 'gap-x-[4px]/foo'])).toEqual('')
+  expect(
+    await run(['gap-x', '-gap-x-4', '-gap-x-[4px]', 'gap-x-4/foo', 'gap-x-[4px]/foo']),
+  ).toEqual('')
 })
 
-test('gap-y', () => {
+test('gap-y', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -6569,19 +7528,21 @@ test('gap-y', () => {
     }
 
     .gap-y-4 {
-      row-gap: var(--spacing-4, 1rem);
+      row-gap: var(--spacing-4);
     }
 
     .gap-y-\\[4px\\] {
       row-gap: 4px;
     }"
   `)
-  expect(run(['gap-y', '-gap-y-4', '-gap-y-[4px]', 'gap-y-4/foo', 'gap-y-[4px]/foo'])).toEqual('')
+  expect(
+    await run(['gap-y', '-gap-y-4', '-gap-y-[4px]', 'gap-y-4/foo', 'gap-y-[4px]/foo']),
+  ).toEqual('')
 })
 
-test('space-x', () => {
+test('space-x', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -6596,40 +7557,35 @@ test('space-x', () => {
     }
 
     :where(.-space-x-4 > :not(:last-child)) {
-      margin-inline-start: calc(calc(var(--spacing-4, 1rem) * -1) * var(--tw-space-x-reverse));
-      margin-inline-end: calc(calc(var(--spacing-4, 1rem) * -1) * calc(1 - var(--tw-space-x-reverse)));
+      --tw-space-x-reverse: 0;
+      margin-inline-start: calc(calc(var(--spacing-4) * -1) * var(--tw-space-x-reverse));
+      margin-inline-end: calc(calc(var(--spacing-4) * -1) * calc(1 - var(--tw-space-x-reverse)));
     }
 
     :where(.space-x-4 > :not(:last-child)) {
-      margin-inline-start: calc(var(--spacing-4, 1rem) * var(--tw-space-x-reverse));
-      margin-inline-end: calc(var(--spacing-4, 1rem) * calc(1 - var(--tw-space-x-reverse)));
+      --tw-space-x-reverse: 0;
+      margin-inline-start: calc(var(--spacing-4) * var(--tw-space-x-reverse));
+      margin-inline-end: calc(var(--spacing-4) * calc(1 - var(--tw-space-x-reverse)));
     }
 
     :where(.space-x-\\[4px\\] > :not(:last-child)) {
+      --tw-space-x-reverse: 0;
       margin-inline-start: calc(4px * var(--tw-space-x-reverse));
       margin-inline-end: calc(4px * calc(1 - var(--tw-space-x-reverse)));
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-space-x-reverse: 0;
-        }
-      }
-    }
-
     @property --tw-space-x-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['space-x', 'space-x-4/foo', 'space-x-[4px]/foo', '-space-x-4/foo'])).toEqual('')
+  expect(await run(['space-x', 'space-x-4/foo', 'space-x-[4px]/foo', '-space-x-4/foo'])).toEqual('')
 })
 
-test('space-y', () => {
+test('space-y', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --spacing-4: 1rem;
@@ -6644,86 +7600,65 @@ test('space-y', () => {
     }
 
     :where(.-space-y-4 > :not(:last-child)) {
-      margin-top: calc(calc(var(--spacing-4, 1rem) * -1) * var(--tw-space-y-reverse));
-      margin-bottom: calc(calc(var(--spacing-4, 1rem) * -1) * calc(1 - var(--tw-space-y-reverse)));
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing-4) * -1) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing-4) * -1) * calc(1 - var(--tw-space-y-reverse)));
     }
 
     :where(.space-y-4 > :not(:last-child)) {
-      margin-top: calc(var(--spacing-4, 1rem) * var(--tw-space-y-reverse));
-      margin-bottom: calc(var(--spacing-4, 1rem) * calc(1 - var(--tw-space-y-reverse)));
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(var(--spacing-4) * var(--tw-space-y-reverse));
+      margin-block-end: calc(var(--spacing-4) * calc(1 - var(--tw-space-y-reverse)));
     }
 
     :where(.space-y-\\[4px\\] > :not(:last-child)) {
-      margin-top: calc(4px * var(--tw-space-y-reverse));
-      margin-bottom: calc(4px * calc(1 - var(--tw-space-y-reverse)));
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-space-y-reverse: 0;
-        }
-      }
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(4px * var(--tw-space-y-reverse));
+      margin-block-end: calc(4px * calc(1 - var(--tw-space-y-reverse)));
     }
 
     @property --tw-space-y-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['space-y', 'space-y-4/foo', 'space-y-[4px]/foo', '-space-y-4/foo'])).toEqual('')
+  expect(await run(['space-y', 'space-y-4/foo', 'space-y-[4px]/foo', '-space-y-4/foo'])).toEqual('')
 })
 
-test('space-x-reverse', () => {
-  expect(run(['space-x-reverse'])).toMatchInlineSnapshot(`
+test('space-x-reverse', async () => {
+  expect(await run(['space-x-reverse'])).toMatchInlineSnapshot(`
     ":where(.space-x-reverse > :not(:last-child)) {
       --tw-space-x-reverse: 1;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-space-x-reverse: 0;
-        }
-      }
-    }
-
     @property --tw-space-x-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['-space-x-reverse', 'space-x-reverse/foo'])).toEqual('')
+  expect(await run(['-space-x-reverse', 'space-x-reverse/foo'])).toEqual('')
 })
 
-test('space-y-reverse', () => {
-  expect(run(['space-y-reverse'])).toMatchInlineSnapshot(`
+test('space-y-reverse', async () => {
+  expect(await run(['space-y-reverse'])).toMatchInlineSnapshot(`
     ":where(.space-y-reverse > :not(:last-child)) {
       --tw-space-y-reverse: 1;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-space-y-reverse: 0;
-        }
-      }
-    }
-
     @property --tw-space-y-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['-space-y-reverse', 'space-y-reverse/foo'])).toEqual('')
+  expect(await run(['-space-y-reverse', 'space-y-reverse/foo'])).toEqual('')
 })
 
-test('divide-x', () => {
+test('divide-x', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @tailwind utilities;
       `,
@@ -6731,53 +7666,49 @@ test('divide-x', () => {
     ),
   ).toMatchInlineSnapshot(`
     ":where(.divide-x > :not(:last-child)) {
+      --tw-divide-x-reverse: 0;
       border-inline-style: var(--tw-border-style);
       border-inline-start-width: calc(1px * var(--tw-divide-x-reverse));
       border-inline-end-width: calc(1px * calc(1 - var(--tw-divide-x-reverse)));
     }
 
     :where(.divide-x-4 > :not(:last-child)) {
+      --tw-divide-x-reverse: 0;
       border-inline-style: var(--tw-border-style);
       border-inline-start-width: calc(4px * var(--tw-divide-x-reverse));
       border-inline-end-width: calc(4px * calc(1 - var(--tw-divide-x-reverse)));
     }
 
     :where(.divide-x-123 > :not(:last-child)) {
+      --tw-divide-x-reverse: 0;
       border-inline-style: var(--tw-border-style);
       border-inline-start-width: calc(123px * var(--tw-divide-x-reverse));
       border-inline-end-width: calc(123px * calc(1 - var(--tw-divide-x-reverse)));
     }
 
     :where(.divide-x-\\[4px\\] > :not(:last-child)) {
+      --tw-divide-x-reverse: 0;
       border-inline-style: var(--tw-border-style);
       border-inline-start-width: calc(4px * var(--tw-divide-x-reverse));
       border-inline-end-width: calc(4px * calc(1 - var(--tw-divide-x-reverse)));
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-divide-x-reverse: 0;
-          --tw-border-style: solid;
-        }
-      }
-    }
-
     @property --tw-divide-x-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-border-style {
-      syntax: "<custom-ident>";
+      syntax: "*";
       inherits: false;
       initial-value: solid;
     }"
   `)
   expect(
-    run([
+    await run([
       '-divide-x',
+      'divide-x--4',
       '-divide-x-4',
       '-divide-x-123',
       'divide-x-unknown',
@@ -6789,9 +7720,9 @@ test('divide-x', () => {
   ).toEqual('')
 })
 
-test('divide-x with custom default border width', () => {
+test('divide-x with custom default border width', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --default-border-width: 2px;
@@ -6806,38 +7737,30 @@ test('divide-x with custom default border width', () => {
     }
 
     :where(.divide-x > :not(:last-child)) {
+      --tw-divide-x-reverse: 0;
       border-inline-style: var(--tw-border-style);
       border-inline-start-width: calc(2px * var(--tw-divide-x-reverse));
       border-inline-end-width: calc(2px * calc(1 - var(--tw-divide-x-reverse)));
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-divide-x-reverse: 0;
-          --tw-border-style: solid;
-        }
-      }
-    }
-
     @property --tw-divide-x-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-border-style {
-      syntax: "<custom-ident>";
+      syntax: "*";
       inherits: false;
       initial-value: solid;
     }"
   `)
-  expect(run(['divide-x/foo'])).toEqual('')
+  expect(await run(['divide-x/foo'])).toEqual('')
 })
 
-test('divide-y', () => {
+test('divide-y', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @tailwind utilities;
       `,
@@ -6845,6 +7768,7 @@ test('divide-y', () => {
     ),
   ).toMatchInlineSnapshot(`
     ":where(.divide-y > :not(:last-child)) {
+      --tw-divide-y-reverse: 0;
       border-bottom-style: var(--tw-border-style);
       border-top-style: var(--tw-border-style);
       border-top-width: calc(1px * var(--tw-divide-y-reverse));
@@ -6852,6 +7776,7 @@ test('divide-y', () => {
     }
 
     :where(.divide-y-4 > :not(:last-child)) {
+      --tw-divide-y-reverse: 0;
       border-bottom-style: var(--tw-border-style);
       border-top-style: var(--tw-border-style);
       border-top-width: calc(4px * var(--tw-divide-y-reverse));
@@ -6859,6 +7784,7 @@ test('divide-y', () => {
     }
 
     :where(.divide-y-123 > :not(:last-child)) {
+      --tw-divide-y-reverse: 0;
       border-bottom-style: var(--tw-border-style);
       border-top-style: var(--tw-border-style);
       border-top-width: calc(123px * var(--tw-divide-y-reverse));
@@ -6866,36 +7792,29 @@ test('divide-y', () => {
     }
 
     :where(.divide-y-\\[4px\\] > :not(:last-child)) {
+      --tw-divide-y-reverse: 0;
       border-bottom-style: var(--tw-border-style);
       border-top-style: var(--tw-border-style);
       border-top-width: calc(4px * var(--tw-divide-y-reverse));
       border-bottom-width: calc(4px * calc(1 - var(--tw-divide-y-reverse)));
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-divide-y-reverse: 0;
-          --tw-border-style: solid;
-        }
-      }
-    }
-
     @property --tw-divide-y-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-border-style {
-      syntax: "<custom-ident>";
+      syntax: "*";
       inherits: false;
       initial-value: solid;
     }"
   `)
   expect(
-    run([
+    await run([
       '-divide-y',
+      'divide-y--4',
       '-divide-y-4',
       '-divide-y-123',
       'divide-y-unknown',
@@ -6907,9 +7826,9 @@ test('divide-y', () => {
   ).toEqual('')
 })
 
-test('divide-y with custom default border width', () => {
+test('divide-y with custom default border width', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --default-border-width: 2px;
@@ -6924,85 +7843,62 @@ test('divide-y with custom default border width', () => {
     }
 
     :where(.divide-y > :not(:last-child)) {
+      --tw-divide-y-reverse: 0;
       border-bottom-style: var(--tw-border-style);
       border-top-style: var(--tw-border-style);
       border-top-width: calc(2px * var(--tw-divide-y-reverse));
       border-bottom-width: calc(2px * calc(1 - var(--tw-divide-y-reverse)));
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-divide-y-reverse: 0;
-          --tw-border-style: solid;
-        }
-      }
-    }
-
     @property --tw-divide-y-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }
 
     @property --tw-border-style {
-      syntax: "<custom-ident>";
+      syntax: "*";
       inherits: false;
       initial-value: solid;
     }"
   `)
-  expect(run(['divide-y/foo'])).toEqual('')
+  expect(await run(['divide-y/foo'])).toEqual('')
 })
 
-test('divide-x-reverse', () => {
-  expect(run(['divide-x-reverse'])).toMatchInlineSnapshot(`
+test('divide-x-reverse', async () => {
+  expect(await run(['divide-x-reverse'])).toMatchInlineSnapshot(`
     ":where(.divide-x-reverse > :not(:last-child)) {
       --tw-divide-x-reverse: 1;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-divide-x-reverse: 0;
-        }
-      }
-    }
-
     @property --tw-divide-x-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['-divide-x-reverse', 'divide-x-reverse/foo'])).toEqual('')
+  expect(await run(['-divide-x-reverse', 'divide-x-reverse/foo'])).toEqual('')
 })
 
-test('divide-y-reverse', () => {
-  expect(run(['divide-y-reverse'])).toMatchInlineSnapshot(`
+test('divide-y-reverse', async () => {
+  expect(await run(['divide-y-reverse'])).toMatchInlineSnapshot(`
     ":where(.divide-y-reverse > :not(:last-child)) {
       --tw-divide-y-reverse: 1;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-divide-y-reverse: 0;
-        }
-      }
-    }
-
     @property --tw-divide-y-reverse {
-      syntax: "<number>";
+      syntax: "*";
       inherits: false;
       initial-value: 0;
     }"
   `)
-  expect(run(['-divide-y-reverse', 'divide-y-reverse/foo'])).toEqual('')
+  expect(await run(['-divide-y-reverse', 'divide-y-reverse/foo'])).toEqual('')
 })
 
-test('divide-style', () => {
-  expect(run(['divide-solid', 'divide-dashed', 'divide-dotted', 'divide-double', 'divide-none']))
-    .toMatchInlineSnapshot(`
+test('divide-style', async () => {
+  expect(
+    await run(['divide-solid', 'divide-dashed', 'divide-dotted', 'divide-double', 'divide-none']),
+  ).toMatchInlineSnapshot(`
       ":where(.divide-dashed > :not(:last-child)) {
         --tw-border-style: dashed;
         border-style: dashed;
@@ -7029,7 +7925,7 @@ test('divide-style', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       'divide',
       '-divide-solid',
       '-divide-dashed',
@@ -7045,9 +7941,9 @@ test('divide-style', () => {
   ).toEqual('')
 })
 
-test('accent', () => {
+test('accent', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -7057,6 +7953,9 @@ test('accent', () => {
       [
         'accent-red-500',
         'accent-red-500/50',
+        'accent-red-500/2.25',
+        'accent-red-500/2.5',
+        'accent-red-500/2.75',
         'accent-red-500/[0.5]',
         'accent-red-500/[50%]',
         'accent-current',
@@ -7081,7 +7980,7 @@ test('accent', () => {
     }
 
     .accent-\\[\\#0088cc\\]\\/50, .accent-\\[\\#0088cc\\]\\/\\[0\\.5\\], .accent-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      accent-color: #0088cc80;
+      accent-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
     .accent-current {
@@ -7089,7 +7988,7 @@ test('accent', () => {
     }
 
     .accent-current\\/50, .accent-current\\/\\[0\\.5\\], .accent-current\\/\\[50\\%\\] {
-      accent-color: color-mix(in srgb, currentColor 50%, transparent);
+      accent-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .accent-inherit {
@@ -7097,11 +7996,23 @@ test('accent', () => {
     }
 
     .accent-red-500 {
-      accent-color: var(--color-red-500, #ef4444);
+      accent-color: var(--color-red-500);
+    }
+
+    .accent-red-500\\/2\\.5 {
+      accent-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .accent-red-500\\/2\\.25 {
+      accent-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .accent-red-500\\/2\\.75 {
+      accent-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .accent-red-500\\/50, .accent-red-500\\/\\[0\\.5\\], .accent-red-500\\/\\[50\\%\\] {
-      accent-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      accent-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .accent-transparent {
@@ -7109,9 +8020,10 @@ test('accent', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'accent',
       '-accent-red-500',
+      'accent-red-500/-50',
       '-accent-red-500/50',
       '-accent-red-500/[0.5]',
       '-accent-red-500/[50%]',
@@ -7121,6 +8033,7 @@ test('accent', () => {
       '-accent-current/[50%]',
       '-accent-inherit',
       '-accent-transparent',
+      'accent-[#0088cc]/-50',
       '-accent-[#0088cc]',
       '-accent-[#0088cc]/50',
       '-accent-[#0088cc]/[0.5]',
@@ -7143,9 +8056,9 @@ test('accent', () => {
   ).toEqual('')
 })
 
-test('caret', () => {
+test('caret', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -7155,6 +8068,9 @@ test('caret', () => {
       [
         'caret-red-500',
         'caret-red-500/50',
+        'caret-red-500/2.25',
+        'caret-red-500/2.5',
+        'caret-red-500/2.75',
         'caret-red-500/[0.5]',
         'caret-red-500/[50%]',
         'caret-current',
@@ -7179,7 +8095,7 @@ test('caret', () => {
     }
 
     .caret-\\[\\#0088cc\\]\\/50, .caret-\\[\\#0088cc\\]\\/\\[0\\.5\\], .caret-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      caret-color: #0088cc80;
+      caret-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
     .caret-current {
@@ -7187,7 +8103,7 @@ test('caret', () => {
     }
 
     .caret-current\\/50, .caret-current\\/\\[0\\.5\\], .caret-current\\/\\[50\\%\\] {
-      caret-color: color-mix(in srgb, currentColor 50%, transparent);
+      caret-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .caret-inherit {
@@ -7195,11 +8111,23 @@ test('caret', () => {
     }
 
     .caret-red-500 {
-      caret-color: var(--color-red-500, #ef4444);
+      caret-color: var(--color-red-500);
+    }
+
+    .caret-red-500\\/2\\.5 {
+      caret-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .caret-red-500\\/2\\.25 {
+      caret-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .caret-red-500\\/2\\.75 {
+      caret-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .caret-red-500\\/50, .caret-red-500\\/\\[0\\.5\\], .caret-red-500\\/\\[50\\%\\] {
-      caret-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      caret-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .caret-transparent {
@@ -7207,7 +8135,7 @@ test('caret', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'caret',
       '-caret-red-500',
       '-caret-red-500/50',
@@ -7241,9 +8169,9 @@ test('caret', () => {
   ).toEqual('')
 })
 
-test('divide-color', () => {
+test('divide-color', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -7253,6 +8181,9 @@ test('divide-color', () => {
       [
         'divide-red-500',
         'divide-red-500/50',
+        'divide-red-500/2.25',
+        'divide-red-500/2.5',
+        'divide-red-500/2.75',
         'divide-red-500/[0.5]',
         'divide-red-500/[50%]',
         'divide-current',
@@ -7276,32 +8207,16 @@ test('divide-color', () => {
       border-color: #08c;
     }
 
-    :where(.divide-\\[\\#0088cc\\]\\/50 > :not(:last-child)) {
-      border-color: #0088cc80;
-    }
-
-    :where(.divide-\\[\\#0088cc\\]\\/\\[0\\.5\\] > :not(:last-child)) {
-      border-color: #0088cc80;
-    }
-
-    :where(.divide-\\[\\#0088cc\\]\\/\\[50\\%\\] > :not(:last-child)) {
-      border-color: #0088cc80;
+    :where(.divide-\\[\\#0088cc\\]\\/50 > :not(:last-child)), :where(.divide-\\[\\#0088cc\\]\\/\\[0\\.5\\] > :not(:last-child)), :where(.divide-\\[\\#0088cc\\]\\/\\[50\\%\\] > :not(:last-child)) {
+      border-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
     :where(.divide-current > :not(:last-child)) {
       border-color: currentColor;
     }
 
-    :where(.divide-current\\/50 > :not(:last-child)) {
-      border-color: color-mix(in srgb, currentColor 50%, transparent);
-    }
-
-    :where(.divide-current\\/\\[0\\.5\\] > :not(:last-child)) {
-      border-color: color-mix(in srgb, currentColor 50%, transparent);
-    }
-
-    :where(.divide-current\\/\\[50\\%\\] > :not(:last-child)) {
-      border-color: color-mix(in srgb, currentColor 50%, transparent);
+    :where(.divide-current\\/50 > :not(:last-child)), :where(.divide-current\\/\\[0\\.5\\] > :not(:last-child)), :where(.divide-current\\/\\[50\\%\\] > :not(:last-child)) {
+      border-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     :where(.divide-inherit > :not(:last-child)) {
@@ -7309,19 +8224,23 @@ test('divide-color', () => {
     }
 
     :where(.divide-red-500 > :not(:last-child)) {
-      border-color: var(--color-red-500, #ef4444);
+      border-color: var(--color-red-500);
     }
 
-    :where(.divide-red-500\\/50 > :not(:last-child)) {
-      border-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+    :where(.divide-red-500\\/2\\.5 > :not(:last-child)) {
+      border-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
     }
 
-    :where(.divide-red-500\\/\\[0\\.5\\] > :not(:last-child)) {
-      border-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+    :where(.divide-red-500\\/2\\.25 > :not(:last-child)) {
+      border-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
     }
 
-    :where(.divide-red-500\\/\\[50\\%\\] > :not(:last-child)) {
-      border-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+    :where(.divide-red-500\\/2\\.75 > :not(:last-child)) {
+      border-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
+    }
+
+    :where(.divide-red-500\\/50 > :not(:last-child)), :where(.divide-red-500\\/\\[0\\.5\\] > :not(:last-child)), :where(.divide-red-500\\/\\[50\\%\\] > :not(:last-child)) {
+      border-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     :where(.divide-transparent > :not(:last-child)) {
@@ -7329,7 +8248,7 @@ test('divide-color', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'divide',
       '-divide-red-500',
       '-divide-red-500/50',
@@ -7363,9 +8282,9 @@ test('divide-color', () => {
   ).toEqual('')
 })
 
-test('place-self', () => {
+test('place-self', async () => {
   expect(
-    run([
+    await run([
       'place-self-auto',
       'place-self-start',
       'place-self-end',
@@ -7394,7 +8313,7 @@ test('place-self', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'place-self',
       '-place-self-auto',
       '-place-self-start',
@@ -7410,9 +8329,16 @@ test('place-self', () => {
   ).toEqual('')
 })
 
-test('self', () => {
+test('self', async () => {
   expect(
-    run(['self-auto', 'self-start', 'self-end', 'self-center', 'self-stretch', 'self-baseline']),
+    await run([
+      'self-auto',
+      'self-start',
+      'self-end',
+      'self-center',
+      'self-stretch',
+      'self-baseline',
+    ]),
   ).toMatchInlineSnapshot(`
     ".self-auto {
       align-self: auto;
@@ -7439,7 +8365,7 @@ test('self', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'self',
       '-self-auto',
       '-self-start',
@@ -7457,9 +8383,9 @@ test('self', () => {
   ).toEqual('')
 })
 
-test('justify-self', () => {
+test('justify-self', async () => {
   expect(
-    run([
+    await run([
       'justify-self-auto',
       'justify-self-start',
       'justify-self-end',
@@ -7489,7 +8415,7 @@ test('justify-self', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'justify-self',
       '-justify-self-auto',
       '-justify-self-start',
@@ -7507,9 +8433,9 @@ test('justify-self', () => {
   ).toEqual('')
 })
 
-test('overflow', () => {
+test('overflow', async () => {
   expect(
-    run([
+    await run([
       'overflow-auto',
       'overflow-hidden',
       'overflow-clip',
@@ -7538,7 +8464,7 @@ test('overflow', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'overflow',
       '-overflow-auto',
       '-overflow-hidden',
@@ -7554,9 +8480,9 @@ test('overflow', () => {
   ).toEqual('')
 })
 
-test('overflow-x', () => {
+test('overflow-x', async () => {
   expect(
-    run([
+    await run([
       'overflow-x-auto',
       'overflow-x-hidden',
       'overflow-x-clip',
@@ -7585,7 +8511,7 @@ test('overflow-x', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'overflow-x',
       '-overflow-x-auto',
       '-overflow-x-hidden',
@@ -7601,9 +8527,9 @@ test('overflow-x', () => {
   ).toEqual('')
 })
 
-test('overflow-y', () => {
+test('overflow-y', async () => {
   expect(
-    run([
+    await run([
       'overflow-y-auto',
       'overflow-y-hidden',
       'overflow-y-clip',
@@ -7632,7 +8558,7 @@ test('overflow-y', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'overflow-y',
       '-overflow-y-auto',
       '-overflow-y-hidden',
@@ -7648,8 +8574,9 @@ test('overflow-y', () => {
   ).toEqual('')
 })
 
-test('overscroll', () => {
-  expect(run(['overscroll-auto', 'overscroll-contain', 'overscroll-none'])).toMatchInlineSnapshot(`
+test('overscroll', async () => {
+  expect(await run(['overscroll-auto', 'overscroll-contain', 'overscroll-none']))
+    .toMatchInlineSnapshot(`
     ".overscroll-auto {
       overscroll-behavior: auto;
     }
@@ -7663,7 +8590,7 @@ test('overscroll', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'overscroll',
       '-overscroll-auto',
       '-overscroll-contain',
@@ -7675,8 +8602,8 @@ test('overscroll', () => {
   ).toEqual('')
 })
 
-test('overscroll-x', () => {
-  expect(run(['overscroll-x-auto', 'overscroll-x-contain', 'overscroll-x-none']))
+test('overscroll-x', async () => {
+  expect(await run(['overscroll-x-auto', 'overscroll-x-contain', 'overscroll-x-none']))
     .toMatchInlineSnapshot(`
     ".overscroll-x-auto {
       overscroll-behavior-x: auto;
@@ -7691,7 +8618,7 @@ test('overscroll-x', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'overscroll-x',
       '-overscroll-x-auto',
       '-overscroll-x-contain',
@@ -7703,8 +8630,8 @@ test('overscroll-x', () => {
   ).toEqual('')
 })
 
-test('overscroll-y', () => {
-  expect(run(['overscroll-y-auto', 'overscroll-y-contain', 'overscroll-y-none']))
+test('overscroll-y', async () => {
+  expect(await run(['overscroll-y-auto', 'overscroll-y-contain', 'overscroll-y-none']))
     .toMatchInlineSnapshot(`
     ".overscroll-y-auto {
       overscroll-behavior-y: auto;
@@ -7719,7 +8646,7 @@ test('overscroll-y', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'overscroll-y',
       '-overscroll-y-auto',
       '-overscroll-y-contain',
@@ -7731,8 +8658,8 @@ test('overscroll-y', () => {
   ).toEqual('')
 })
 
-test('scroll-behavior', () => {
-  expect(run(['scroll-auto', 'scroll-smooth'])).toMatchInlineSnapshot(`
+test('scroll-behavior', async () => {
+  expect(await run(['scroll-auto', 'scroll-smooth'])).toMatchInlineSnapshot(`
     ".scroll-auto {
       scroll-behavior: auto;
     }
@@ -7742,23 +8669,23 @@ test('scroll-behavior', () => {
     }"
   `)
   expect(
-    run(['scroll', '-scroll-auto', '-scroll-smooth', 'scroll-auto/foo', 'scroll-smooth/foo']),
+    await run(['scroll', '-scroll-auto', '-scroll-smooth', 'scroll-auto/foo', 'scroll-smooth/foo']),
   ).toEqual('')
 })
 
-test('truncate', () => {
-  expect(run(['truncate'])).toMatchInlineSnapshot(`
+test('truncate', async () => {
+  expect(await run(['truncate'])).toMatchInlineSnapshot(`
     ".truncate {
       text-overflow: ellipsis;
       white-space: nowrap;
       overflow: hidden;
     }"
   `)
-  expect(run(['-truncate', 'truncate/foo'])).toEqual('')
+  expect(await run(['-truncate', 'truncate/foo'])).toEqual('')
 })
 
-test('text-overflow', () => {
-  expect(run(['text-ellipsis', 'text-clip'])).toMatchInlineSnapshot(`
+test('text-overflow', async () => {
+  expect(await run(['text-ellipsis', 'text-clip'])).toMatchInlineSnapshot(`
     ".text-clip {
       text-overflow: clip;
     }
@@ -7767,11 +8694,13 @@ test('text-overflow', () => {
       text-overflow: ellipsis;
     }"
   `)
-  expect(run(['-text-ellipsis', '-text-clip', 'text-ellipsis/foo', 'text-clip/foo'])).toEqual('')
+  expect(await run(['-text-ellipsis', '-text-clip', 'text-ellipsis/foo', 'text-clip/foo'])).toEqual(
+    '',
+  )
 })
 
-test('hyphens', () => {
-  expect(run(['hyphens-none', 'hyphens-manual', 'hyphens-auto'])).toMatchInlineSnapshot(`
+test('hyphens', async () => {
+  expect(await run(['hyphens-none', 'hyphens-manual', 'hyphens-auto'])).toMatchInlineSnapshot(`
     ".hyphens-auto {
       -webkit-hyphens: auto;
       hyphens: auto;
@@ -7788,7 +8717,7 @@ test('hyphens', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'hyphens',
       '-hyphens-none',
       '-hyphens-manual',
@@ -7800,9 +8729,9 @@ test('hyphens', () => {
   ).toEqual('')
 })
 
-test('whitespace', () => {
+test('whitespace', async () => {
   expect(
-    run([
+    await run([
       'whitespace-normal',
       'whitespace-nowrap',
       'whitespace-pre',
@@ -7836,7 +8765,7 @@ test('whitespace', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'whitespace',
       '-whitespace-normal',
       '-whitespace-nowrap',
@@ -7854,8 +8783,9 @@ test('whitespace', () => {
   ).toEqual('')
 })
 
-test('text-wrap', () => {
-  expect(run(['text-wrap', 'text-nowrap', 'text-balance', 'text-pretty'])).toMatchInlineSnapshot(`
+test('text-wrap', async () => {
+  expect(await run(['text-wrap', 'text-nowrap', 'text-balance', 'text-pretty']))
+    .toMatchInlineSnapshot(`
     ".text-balance {
       text-wrap: balance;
     }
@@ -7873,7 +8803,7 @@ test('text-wrap', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-text-wrap',
       '-text-nowrap',
       '-text-balance',
@@ -7886,27 +8816,28 @@ test('text-wrap', () => {
   ).toEqual('')
 })
 
-test('overflow-wrap', () => {
-  expect(run(['break-normal', 'break-words', 'break-all', 'break-keep'])).toMatchInlineSnapshot(`
-    ".break-normal {
-      overflow-wrap: normal;
-      word-break: normal;
-    }
+test('overflow-wrap', async () => {
+  expect(await run(['break-normal', 'break-words', 'break-all', 'break-keep']))
+    .toMatchInlineSnapshot(`
+      ".break-normal {
+        overflow-wrap: normal;
+        word-break: normal;
+      }
 
-    .break-words {
-      overflow-wrap: break-word;
-    }
+      .break-words {
+        overflow-wrap: break-word;
+      }
 
-    .break-all {
-      word-break: break-all;
-    }
+      .break-all {
+        word-break: break-all;
+      }
 
-    .break-keep {
-      word-break: break-keep;
-    }"
-  `)
+      .break-keep {
+        word-break: keep-all;
+      }"
+    `)
   expect(
-    run([
+    await run([
       '-break-normal',
       '-break-words',
       '-break-all',
@@ -7919,9 +8850,9 @@ test('overflow-wrap', () => {
   ).toEqual('')
 })
 
-test('rounded', () => {
+test('rounded', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-sm: 0.125rem;
@@ -7938,7 +8869,7 @@ test('rounded', () => {
     }
 
     .rounded {
-      border-radius: var(--radius, .25rem);
+      border-radius: var(--radius);
     }
 
     .rounded-\\[4px\\] {
@@ -7954,11 +8885,11 @@ test('rounded', () => {
     }
 
     .rounded-sm {
-      border-radius: var(--radius-sm, .125rem);
+      border-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded',
       '-rounded-full',
       '-rounded-none',
@@ -7973,9 +8904,9 @@ test('rounded', () => {
   ).toEqual('')
 })
 
-test('rounded-s', () => {
+test('rounded-s', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -7996,8 +8927,8 @@ test('rounded-s', () => {
     }
 
     .rounded-s {
-      border-start-start-radius: var(--radius, .25rem);
-      border-end-start-radius: var(--radius, .25rem);
+      border-start-start-radius: var(--radius);
+      border-end-start-radius: var(--radius);
     }
 
     .rounded-s-\\[4px\\] {
@@ -8006,22 +8937,22 @@ test('rounded-s', () => {
     }
 
     .rounded-s-full {
-      border-start-start-radius: 3.40282e38px;
-      border-end-start-radius: 3.40282e38px;
+      border-start-start-radius: var(--radius-full);
+      border-end-start-radius: var(--radius-full);
     }
 
     .rounded-s-none {
-      border-start-start-radius: 0;
-      border-end-start-radius: 0;
+      border-start-start-radius: var(--radius-none);
+      border-end-start-radius: var(--radius-none);
     }
 
     .rounded-s-sm {
-      border-start-start-radius: var(--radius-sm, .125rem);
-      border-end-start-radius: var(--radius-sm, .125rem);
+      border-start-start-radius: var(--radius-sm);
+      border-end-start-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-s',
       '-rounded-s-full',
       '-rounded-s-none',
@@ -8036,9 +8967,9 @@ test('rounded-s', () => {
   ).toEqual('')
 })
 
-test('rounded-e', () => {
+test('rounded-e', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8059,8 +8990,8 @@ test('rounded-e', () => {
     }
 
     .rounded-e {
-      border-start-end-radius: var(--radius, .25rem);
-      border-end-end-radius: var(--radius, .25rem);
+      border-start-end-radius: var(--radius);
+      border-end-end-radius: var(--radius);
     }
 
     .rounded-e-\\[4px\\] {
@@ -8069,22 +9000,22 @@ test('rounded-e', () => {
     }
 
     .rounded-e-full {
-      border-start-end-radius: 3.40282e38px;
-      border-end-end-radius: 3.40282e38px;
+      border-start-end-radius: var(--radius-full);
+      border-end-end-radius: var(--radius-full);
     }
 
     .rounded-e-none {
-      border-start-end-radius: 0;
-      border-end-end-radius: 0;
+      border-start-end-radius: var(--radius-none);
+      border-end-end-radius: var(--radius-none);
     }
 
     .rounded-e-sm {
-      border-start-end-radius: var(--radius-sm, .125rem);
-      border-end-end-radius: var(--radius-sm, .125rem);
+      border-start-end-radius: var(--radius-sm);
+      border-end-end-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-e',
       '-rounded-e-full',
       '-rounded-e-none',
@@ -8099,9 +9030,9 @@ test('rounded-e', () => {
   ).toEqual('')
 })
 
-test('rounded-t', () => {
+test('rounded-t', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8122,8 +9053,8 @@ test('rounded-t', () => {
     }
 
     .rounded-t {
-      border-top-left-radius: var(--radius, .25rem);
-      border-top-right-radius: var(--radius, .25rem);
+      border-top-left-radius: var(--radius);
+      border-top-right-radius: var(--radius);
     }
 
     .rounded-t-\\[4px\\] {
@@ -8134,20 +9065,24 @@ test('rounded-t', () => {
     .rounded-t-full {
       border-top-left-radius: 3.40282e38px;
       border-top-right-radius: 3.40282e38px;
+      border-top-left-radius: var(--radius-full);
+      border-top-right-radius: var(--radius-full);
     }
 
     .rounded-t-none {
       border-top-left-radius: 0;
       border-top-right-radius: 0;
+      border-top-left-radius: var(--radius-none);
+      border-top-right-radius: var(--radius-none);
     }
 
     .rounded-t-sm {
-      border-top-left-radius: var(--radius-sm, .125rem);
-      border-top-right-radius: var(--radius-sm, .125rem);
+      border-top-left-radius: var(--radius-sm);
+      border-top-right-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-t',
       '-rounded-t-full',
       '-rounded-t-none',
@@ -8162,9 +9097,9 @@ test('rounded-t', () => {
   ).toEqual('')
 })
 
-test('rounded-r', () => {
+test('rounded-r', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8185,8 +9120,8 @@ test('rounded-r', () => {
     }
 
     .rounded-r {
-      border-top-right-radius: var(--radius, .25rem);
-      border-bottom-right-radius: var(--radius, .25rem);
+      border-top-right-radius: var(--radius);
+      border-bottom-right-radius: var(--radius);
     }
 
     .rounded-r-\\[4px\\] {
@@ -8197,20 +9132,24 @@ test('rounded-r', () => {
     .rounded-r-full {
       border-top-right-radius: 3.40282e38px;
       border-bottom-right-radius: 3.40282e38px;
+      border-top-right-radius: var(--radius-full);
+      border-bottom-right-radius: var(--radius-full);
     }
 
     .rounded-r-none {
       border-top-right-radius: 0;
       border-bottom-right-radius: 0;
+      border-top-right-radius: var(--radius-none);
+      border-bottom-right-radius: var(--radius-none);
     }
 
     .rounded-r-sm {
-      border-top-right-radius: var(--radius-sm, .125rem);
-      border-bottom-right-radius: var(--radius-sm, .125rem);
+      border-top-right-radius: var(--radius-sm);
+      border-bottom-right-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-r',
       '-rounded-r-full',
       '-rounded-r-none',
@@ -8225,9 +9164,9 @@ test('rounded-r', () => {
   ).toEqual('')
 })
 
-test('rounded-b', () => {
+test('rounded-b', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8248,8 +9187,8 @@ test('rounded-b', () => {
     }
 
     .rounded-b {
-      border-bottom-right-radius: var(--radius, .25rem);
-      border-bottom-left-radius: var(--radius, .25rem);
+      border-bottom-right-radius: var(--radius);
+      border-bottom-left-radius: var(--radius);
     }
 
     .rounded-b-\\[4px\\] {
@@ -8260,20 +9199,24 @@ test('rounded-b', () => {
     .rounded-b-full {
       border-bottom-right-radius: 3.40282e38px;
       border-bottom-left-radius: 3.40282e38px;
+      border-bottom-right-radius: var(--radius-full);
+      border-bottom-left-radius: var(--radius-full);
     }
 
     .rounded-b-none {
       border-bottom-right-radius: 0;
       border-bottom-left-radius: 0;
+      border-bottom-right-radius: var(--radius-none);
+      border-bottom-left-radius: var(--radius-none);
     }
 
     .rounded-b-sm {
-      border-bottom-right-radius: var(--radius-sm, .125rem);
-      border-bottom-left-radius: var(--radius-sm, .125rem);
+      border-bottom-right-radius: var(--radius-sm);
+      border-bottom-left-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-b',
       '-rounded-b-full',
       '-rounded-b-none',
@@ -8288,9 +9231,9 @@ test('rounded-b', () => {
   ).toEqual('')
 })
 
-test('rounded-l', () => {
+test('rounded-l', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8311,8 +9254,8 @@ test('rounded-l', () => {
     }
 
     .rounded-l {
-      border-top-left-radius: var(--radius, .25rem);
-      border-bottom-left-radius: var(--radius, .25rem);
+      border-top-left-radius: var(--radius);
+      border-bottom-left-radius: var(--radius);
     }
 
     .rounded-l-\\[4px\\] {
@@ -8323,20 +9266,24 @@ test('rounded-l', () => {
     .rounded-l-full {
       border-top-left-radius: 3.40282e38px;
       border-bottom-left-radius: 3.40282e38px;
+      border-top-left-radius: var(--radius-full);
+      border-bottom-left-radius: var(--radius-full);
     }
 
     .rounded-l-none {
       border-top-left-radius: 0;
       border-bottom-left-radius: 0;
+      border-top-left-radius: var(--radius-none);
+      border-bottom-left-radius: var(--radius-none);
     }
 
     .rounded-l-sm {
-      border-top-left-radius: var(--radius-sm, .125rem);
-      border-bottom-left-radius: var(--radius-sm, .125rem);
+      border-top-left-radius: var(--radius-sm);
+      border-bottom-left-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-l',
       '-rounded-l-full',
       '-rounded-l-none',
@@ -8351,9 +9298,9 @@ test('rounded-l', () => {
   ).toEqual('')
 })
 
-test('rounded-ss', () => {
+test('rounded-ss', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8374,7 +9321,7 @@ test('rounded-ss', () => {
     }
 
     .rounded-ss {
-      border-start-start-radius: var(--radius, .25rem);
+      border-start-start-radius: var(--radius);
     }
 
     .rounded-ss-\\[4px\\] {
@@ -8382,19 +9329,19 @@ test('rounded-ss', () => {
     }
 
     .rounded-ss-full {
-      border-start-start-radius: 3.40282e38px;
+      border-start-start-radius: var(--radius-full);
     }
 
     .rounded-ss-none {
-      border-start-start-radius: 0;
+      border-start-start-radius: var(--radius-none);
     }
 
     .rounded-ss-sm {
-      border-start-start-radius: var(--radius-sm, .125rem);
+      border-start-start-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-ss',
       '-rounded-ss-full',
       '-rounded-ss-none',
@@ -8409,9 +9356,9 @@ test('rounded-ss', () => {
   ).toEqual('')
 })
 
-test('rounded-se', () => {
+test('rounded-se', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8432,7 +9379,7 @@ test('rounded-se', () => {
     }
 
     .rounded-se {
-      border-start-end-radius: var(--radius, .25rem);
+      border-start-end-radius: var(--radius);
     }
 
     .rounded-se-\\[4px\\] {
@@ -8440,19 +9387,19 @@ test('rounded-se', () => {
     }
 
     .rounded-se-full {
-      border-start-end-radius: 3.40282e38px;
+      border-start-end-radius: var(--radius-full);
     }
 
     .rounded-se-none {
-      border-start-end-radius: 0;
+      border-start-end-radius: var(--radius-none);
     }
 
     .rounded-se-sm {
-      border-start-end-radius: var(--radius-sm, .125rem);
+      border-start-end-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-se',
       '-rounded-se-full',
       '-rounded-se-none',
@@ -8467,9 +9414,9 @@ test('rounded-se', () => {
   ).toEqual('')
 })
 
-test('rounded-ee', () => {
+test('rounded-ee', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8490,7 +9437,7 @@ test('rounded-ee', () => {
     }
 
     .rounded-ee {
-      border-end-end-radius: var(--radius, .25rem);
+      border-end-end-radius: var(--radius);
     }
 
     .rounded-ee-\\[4px\\] {
@@ -8498,19 +9445,19 @@ test('rounded-ee', () => {
     }
 
     .rounded-ee-full {
-      border-end-end-radius: 3.40282e38px;
+      border-end-end-radius: var(--radius-full);
     }
 
     .rounded-ee-none {
-      border-end-end-radius: 0;
+      border-end-end-radius: var(--radius-none);
     }
 
     .rounded-ee-sm {
-      border-end-end-radius: var(--radius-sm, .125rem);
+      border-end-end-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-ee',
       '-rounded-ee-full',
       '-rounded-ee-none',
@@ -8525,9 +9472,9 @@ test('rounded-ee', () => {
   ).toEqual('')
 })
 
-test('rounded-es', () => {
+test('rounded-es', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8548,7 +9495,7 @@ test('rounded-es', () => {
     }
 
     .rounded-es {
-      border-end-start-radius: var(--radius, .25rem);
+      border-end-start-radius: var(--radius);
     }
 
     .rounded-es-\\[4px\\] {
@@ -8556,19 +9503,19 @@ test('rounded-es', () => {
     }
 
     .rounded-es-full {
-      border-end-start-radius: 3.40282e38px;
+      border-end-start-radius: var(--radius-full);
     }
 
     .rounded-es-none {
-      border-end-start-radius: 0;
+      border-end-start-radius: var(--radius-none);
     }
 
     .rounded-es-sm {
-      border-end-start-radius: var(--radius-sm, .125rem);
+      border-end-start-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-es',
       '-rounded-es-full',
       '-rounded-es-none',
@@ -8583,9 +9530,9 @@ test('rounded-es', () => {
   ).toEqual('')
 })
 
-test('rounded-tl', () => {
+test('rounded-tl', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8606,7 +9553,7 @@ test('rounded-tl', () => {
     }
 
     .rounded-tl {
-      border-top-left-radius: var(--radius, .25rem);
+      border-top-left-radius: var(--radius);
     }
 
     .rounded-tl-\\[4px\\] {
@@ -8615,18 +9562,20 @@ test('rounded-tl', () => {
 
     .rounded-tl-full {
       border-top-left-radius: 3.40282e38px;
+      border-top-left-radius: var(--radius-full);
     }
 
     .rounded-tl-none {
       border-top-left-radius: 0;
+      border-top-left-radius: var(--radius-none);
     }
 
     .rounded-tl-sm {
-      border-top-left-radius: var(--radius-sm, .125rem);
+      border-top-left-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-tl',
       '-rounded-tl-full',
       '-rounded-tl-none',
@@ -8641,9 +9590,9 @@ test('rounded-tl', () => {
   ).toEqual('')
 })
 
-test('rounded-tr', () => {
+test('rounded-tr', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8664,7 +9613,7 @@ test('rounded-tr', () => {
     }
 
     .rounded-tr {
-      border-top-right-radius: var(--radius, .25rem);
+      border-top-right-radius: var(--radius);
     }
 
     .rounded-tr-\\[4px\\] {
@@ -8673,18 +9622,20 @@ test('rounded-tr', () => {
 
     .rounded-tr-full {
       border-top-right-radius: 3.40282e38px;
+      border-top-right-radius: var(--radius-full);
     }
 
     .rounded-tr-none {
       border-top-right-radius: 0;
+      border-top-right-radius: var(--radius-none);
     }
 
     .rounded-tr-sm {
-      border-top-right-radius: var(--radius-sm, .125rem);
+      border-top-right-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-tr',
       '-rounded-tr-full',
       '-rounded-tr-none',
@@ -8699,9 +9650,9 @@ test('rounded-tr', () => {
   ).toEqual('')
 })
 
-test('rounded-br', () => {
+test('rounded-br', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8722,7 +9673,7 @@ test('rounded-br', () => {
     }
 
     .rounded-br {
-      border-bottom-right-radius: var(--radius, .25rem);
+      border-bottom-right-radius: var(--radius);
     }
 
     .rounded-br-\\[4px\\] {
@@ -8731,18 +9682,20 @@ test('rounded-br', () => {
 
     .rounded-br-full {
       border-bottom-right-radius: 3.40282e38px;
+      border-bottom-right-radius: var(--radius-full);
     }
 
     .rounded-br-none {
       border-bottom-right-radius: 0;
+      border-bottom-right-radius: var(--radius-none);
     }
 
     .rounded-br-sm {
-      border-bottom-right-radius: var(--radius-sm, .125rem);
+      border-bottom-right-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-br',
       '-rounded-br-full',
       '-rounded-br-none',
@@ -8757,9 +9710,9 @@ test('rounded-br', () => {
   ).toEqual('')
 })
 
-test('rounded-bl', () => {
+test('rounded-bl', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --radius-none: 0px;
@@ -8780,7 +9733,7 @@ test('rounded-bl', () => {
     }
 
     .rounded-bl {
-      border-bottom-left-radius: var(--radius, .25rem);
+      border-bottom-left-radius: var(--radius);
     }
 
     .rounded-bl-\\[4px\\] {
@@ -8789,18 +9742,20 @@ test('rounded-bl', () => {
 
     .rounded-bl-full {
       border-bottom-left-radius: 3.40282e38px;
+      border-bottom-left-radius: var(--radius-full);
     }
 
     .rounded-bl-none {
       border-bottom-left-radius: 0;
+      border-bottom-left-radius: var(--radius-none);
     }
 
     .rounded-bl-sm {
-      border-bottom-left-radius: var(--radius-sm, .125rem);
+      border-bottom-left-radius: var(--radius-sm);
     }"
   `)
   expect(
-    run([
+    await run([
       '-rounded-bl',
       '-rounded-bl-full',
       '-rounded-bl-none',
@@ -8815,9 +9770,9 @@ test('rounded-bl', () => {
   ).toEqual('')
 })
 
-test('border-style', () => {
+test('border-style', async () => {
   expect(
-    run([
+    await run([
       'border-solid',
       'border-dashed',
       'border-dotted',
@@ -8857,7 +9812,7 @@ test('border-style', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-border-solid',
       '-border-dashed',
       '-border-dotted',
@@ -8889,7 +9844,7 @@ const prefixes = [
 ]
 
 for (let prefix of prefixes) {
-  test(`${prefix}-*`, () => {
+  test(`${prefix}-*`, async () => {
     let classes = []
 
     // Width
@@ -8904,12 +9859,15 @@ for (let prefix of prefixes) {
     classes.push(`${prefix}-[medium]`)
     classes.push(`${prefix}-[thick]`)
     classes.push(`${prefix}-[12px]`)
-    classes.push(`${prefix}-[length:--my-width]`)
-    classes.push(`${prefix}-[line-width:--my-width]`)
+    classes.push(`${prefix}-[length:var(--my-width)]`)
+    classes.push(`${prefix}-[line-width:var(--my-width)]`)
 
     // Color
     classes.push(`${prefix}-red-500`)
     classes.push(`${prefix}-red-500/50`)
+    classes.push(`${prefix}-red-500/2.25`)
+    classes.push(`${prefix}-red-500/2.5`)
+    classes.push(`${prefix}-red-500/2.75`)
     classes.push(`${prefix}-[#0088cc]`)
     classes.push(`${prefix}-[#0088cc]/50`)
     classes.push(`${prefix}-current`)
@@ -8918,13 +9876,13 @@ for (let prefix of prefixes) {
     classes.push(`${prefix}-transparent`)
 
     // Inference: Color
-    classes.push(`${prefix}-[--my-color]`)
-    classes.push(`${prefix}-[--my-color]/50`)
-    classes.push(`${prefix}-[color:--my-color]`)
-    classes.push(`${prefix}-[color:--my-color]/50`)
+    classes.push(`${prefix}-[var(--my-color)]`)
+    classes.push(`${prefix}-[var(--my-color)]/50`)
+    classes.push(`${prefix}-[color:var(--my-color)]`)
+    classes.push(`${prefix}-[color:var(--my-color)]/50`)
 
     expect(
-      compileCss(
+      await compileCss(
         css`
           @theme {
             --radius-none: 0px;
@@ -8939,9 +9897,9 @@ for (let prefix of prefixes) {
     ).toMatchSnapshot()
 
     // No border utilities can ever be negative
-    expect(run(classes.map((cls) => `-${cls}`))).toEqual('')
+    expect(await run(classes.map((cls) => `-${cls}`))).toEqual('')
     expect(
-      run([
+      await run([
         `${prefix}/foo`,
         `${prefix}-0/foo`,
         `${prefix}-2/foo`,
@@ -8951,16 +9909,16 @@ for (let prefix of prefixes) {
         `${prefix}-[medium]/foo`,
         `${prefix}-[thick]/foo`,
         `${prefix}-[12px]/foo`,
-        `${prefix}-[length:--my-width]/foo`,
-        `${prefix}-[line-width:--my-width]/foo`,
+        `${prefix}-[length:var(--my-width)]/foo`,
+        `${prefix}-[line-width:var(--my-width)]/foo`,
       ]),
     ).toEqual('')
   })
 }
 
-test('border with custom default border width', () => {
+test('border with custom default border width', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --default-border-width: 2px;
@@ -8979,26 +9937,18 @@ test('border with custom default border width', () => {
       border-width: 2px;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-border-style: solid;
-        }
-      }
-    }
-
     @property --tw-border-style {
-      syntax: "<custom-ident>";
+      syntax: "*";
       inherits: false;
       initial-value: solid;
     }"
   `)
-  expect(run(['-border', 'border/foo'])).toEqual('')
+  expect(await run(['-border', 'border/foo'])).toEqual('')
 })
 
-test('bg', () => {
+test('bg', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -9009,40 +9959,33 @@ test('bg', () => {
         // background-color
         'bg-red-500',
         'bg-red-500/50',
+        'bg-red-500/2.25',
+        'bg-red-500/2.5',
+        'bg-red-500/2.75',
         'bg-red-500/[0.5]',
         'bg-red-500/[50%]',
         'bg-current',
         'bg-current/50',
         'bg-current/[0.5]',
         'bg-current/[50%]',
-        'bg-current/[--bg-opacity]',
+        'bg-current/[var(--bg-opacity)]',
         'bg-inherit',
         'bg-transparent',
         'bg-[#0088cc]',
         'bg-[#0088cc]/50',
         'bg-[#0088cc]/[0.5]',
         'bg-[#0088cc]/[50%]',
-        'bg-[--some-var]',
-        'bg-[--some-var]/50',
-        'bg-[--some-var]/[0.5]',
-        'bg-[--some-var]/[50%]',
-        'bg-[color:--some-var]',
-        'bg-[color:--some-var]/50',
-        'bg-[color:--some-var]/[0.5]',
-        'bg-[color:--some-var]/[50%]',
+        'bg-[var(--some-var)]',
+        'bg-[var(--some-var)]/50',
+        'bg-[var(--some-var)]/[0.5]',
+        'bg-[var(--some-var)]/[50%]',
+        'bg-[color:var(--some-var)]',
+        'bg-[color:var(--some-var)]/50',
+        'bg-[color:var(--some-var)]/[0.5]',
+        'bg-[color:var(--some-var)]/[50%]',
 
         // background-image
         'bg-none',
-
-        // Legacy linear-gradient API
-        'bg-gradient-to-t',
-        'bg-gradient-to-tr',
-        'bg-gradient-to-r',
-        'bg-gradient-to-br',
-        'bg-gradient-to-b',
-        'bg-gradient-to-bl',
-        'bg-gradient-to-l',
-        'bg-gradient-to-tl',
 
         // Modern linear-gradient API
         'bg-linear-to-t',
@@ -9053,11 +9996,54 @@ test('bg', () => {
         'bg-linear-to-bl',
         'bg-linear-to-l',
         'bg-linear-to-tl',
+        'bg-linear-45',
+        '-bg-linear-45',
+
+        // With interpolation mode modifier
+        'bg-linear-to-r/oklch',
+        'bg-linear-to-r/oklab',
+        'bg-linear-to-r/hsl',
+        'bg-linear-to-r/srgb',
+        'bg-linear-to-r/longer',
+        'bg-linear-to-r/shorter',
+        'bg-linear-to-r/increasing',
+        'bg-linear-to-r/decreasing',
+        'bg-linear-to-r/[in_hsl_longer_hue]',
+        'bg-linear-45/oklab',
+        '-bg-linear-45/oklab',
+        'bg-linear-45/shorter',
+        'bg-linear-45/[in_hsl_longer_hue]',
+        'bg-conic/oklch',
+        'bg-conic/oklab',
+        'bg-conic/hsl',
+        'bg-conic/srgb',
+        'bg-conic/longer',
+        'bg-conic/shorter',
+        'bg-conic/increasing',
+        'bg-conic/decreasing',
+        'bg-conic/[in_hsl_longer_hue]',
+        'bg-conic-45/oklab',
+        '-bg-conic-45/oklab',
+        'bg-conic-45/shorter',
+        'bg-conic-45/[in_hsl_longer_hue]',
+        'bg-radial/oklch',
+        'bg-radial/oklab',
+        'bg-radial/hsl',
+        'bg-radial/srgb',
+        'bg-radial/longer',
+        'bg-radial/shorter',
+        'bg-radial/increasing',
+        'bg-radial/decreasing',
+        'bg-radial/[in_hsl_longer_hue]',
+        'bg-radial-[circle_at_center]',
+        // Invalid but proves not converted to `in oklch longer hue` when used
+        // as an arbitrary value
+        'bg-linear-to-r/[longer]',
 
         'bg-[url(/image.png)]',
-        'bg-[url:--my-url]',
+        'bg-[url:var(--my-url)]',
         'bg-[linear-gradient(to_bottom,red,blue)]',
-        'bg-[image:--my-gradient]',
+        'bg-[image:var(--my-gradient)]',
         'bg-linear-[125deg]',
         'bg-linear-[1.3rad]',
         'bg-linear-[to_bottom]',
@@ -9098,8 +10084,8 @@ test('bg', () => {
         'bg-no-repeat',
         'bg-repeat-x',
         'bg-repeat-y',
-        'bg-round',
-        'bg-space',
+        'bg-repeat-round',
+        'bg-repeat-space',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -9112,39 +10098,35 @@ test('bg', () => {
     }
 
     .bg-\\[\\#0088cc\\]\\/50, .bg-\\[\\#0088cc\\]\\/\\[0\\.5\\], .bg-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      background-color: #0088cc80;
+      background-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .bg-\\[--some-var\\] {
+    .bg-\\[color\\:var\\(--some-var\\)\\] {
       background-color: var(--some-var);
     }
 
-    .bg-\\[--some-var\\]\\/50, .bg-\\[--some-var\\]\\/\\[0\\.5\\], .bg-\\[--some-var\\]\\/\\[50\\%\\] {
-      background-color: color-mix(in srgb, var(--some-var) 50%, transparent);
+    .bg-\\[color\\:var\\(--some-var\\)\\]\\/50, .bg-\\[color\\:var\\(--some-var\\)\\]\\/\\[0\\.5\\], .bg-\\[color\\:var\\(--some-var\\)\\]\\/\\[50\\%\\] {
+      background-color: color-mix(in oklab, var(--some-var) 50%, transparent);
     }
 
-    .bg-\\[color\\:--some-var\\] {
+    .bg-\\[var\\(--some-var\\)\\] {
       background-color: var(--some-var);
     }
 
-    .bg-\\[color\\:--some-var\\]\\/50, .bg-\\[color\\:--some-var\\]\\/\\[0\\.5\\], .bg-\\[color\\:--some-var\\]\\/\\[50\\%\\] {
-      background-color: color-mix(in srgb, var(--some-var) 50%, transparent);
+    .bg-\\[var\\(--some-var\\)\\]\\/50, .bg-\\[var\\(--some-var\\)\\]\\/\\[0\\.5\\], .bg-\\[var\\(--some-var\\)\\]\\/\\[50\\%\\] {
+      background-color: color-mix(in oklab, var(--some-var) 50%, transparent);
     }
 
     .bg-current {
       background-color: currentColor;
     }
 
-    .bg-current\\/50 {
-      background-color: color-mix(in srgb, currentColor 50%, transparent);
+    .bg-current\\/50, .bg-current\\/\\[0\\.5\\], .bg-current\\/\\[50\\%\\] {
+      background-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
-    .bg-current\\/\\[--bg-opacity\\] {
-      background-color: color-mix(in srgb, currentColor calc(var(--bg-opacity) * 100%), transparent);
-    }
-
-    .bg-current\\/\\[0\\.5\\], .bg-current\\/\\[50\\%\\] {
-      background-color: color-mix(in srgb, currentColor 50%, transparent);
+    .bg-current\\/\\[var\\(--bg-opacity\\)\\] {
+      background-color: color-mix(in oklab, currentColor var(--bg-opacity), transparent);
     }
 
     .bg-inherit {
@@ -9152,26 +10134,285 @@ test('bg', () => {
     }
 
     .bg-red-500 {
-      background-color: var(--color-red-500, #ef4444);
+      background-color: var(--color-red-500);
+    }
+
+    .bg-red-500\\/2\\.5 {
+      background-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .bg-red-500\\/2\\.25 {
+      background-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .bg-red-500\\/2\\.75 {
+      background-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .bg-red-500\\/50, .bg-red-500\\/\\[0\\.5\\], .bg-red-500\\/\\[50\\%\\] {
-      background-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      background-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .bg-transparent {
       background-color: #0000;
     }
 
+    .-bg-conic-45\\/oklab {
+      --tw-gradient-position: from calc(45 * -1) in oklab, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .-bg-linear-45, .-bg-linear-45\\/oklab {
+      --tw-gradient-position: calc(45deg * -1) in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
     .-bg-linear-\\[1\\.3rad\\] {
-      background-image: linear-gradient(calc(74.4845deg * -1), var(--tw-gradient-stops, ));
+      --tw-gradient-position: calc(74.4845deg * -1), ;
+      background-image: linear-gradient(var(--tw-gradient-stops, calc(74.4845deg * -1)));
     }
 
     .-bg-linear-\\[125deg\\] {
-      background-image: linear-gradient(calc(125deg * -1), var(--tw-gradient-stops, ));
+      --tw-gradient-position: calc(125deg * -1), ;
+      background-image: linear-gradient(var(--tw-gradient-stops, calc(125deg * -1)));
     }
 
-    .bg-\\[image\\:--my-gradient\\] {
+    .bg-conic-45\\/\\[in_hsl_longer_hue\\] {
+      --tw-gradient-position: from 45deg in hsl longer hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic-45\\/oklab {
+      --tw-gradient-position: from 45deg in oklab, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic-45\\/shorter {
+      --tw-gradient-position: from 45deg in oklch shorter hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/\\[in_hsl_longer_hue\\] {
+      --tw-gradient-position: in hsl longer hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/decreasing {
+      --tw-gradient-position: in oklch decreasing hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/hsl {
+      --tw-gradient-position: in hsl, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/increasing {
+      --tw-gradient-position: in oklch increasing hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/longer {
+      --tw-gradient-position: in oklch longer hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/oklab {
+      --tw-gradient-position: in oklab, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/oklch {
+      --tw-gradient-position: in oklch, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/shorter {
+      --tw-gradient-position: in oklch shorter hue, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-conic\\/srgb {
+      --tw-gradient-position: in srgb, ;
+      background-image: conic-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-45 {
+      --tw-gradient-position: 45deg in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-45\\/\\[in_hsl_longer_hue\\] {
+      --tw-gradient-position: 45deg in hsl longer hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-45\\/oklab {
+      --tw-gradient-position: 45deg in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-45\\/shorter {
+      --tw-gradient-position: 45deg in oklch shorter hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-\\[1\\.3rad\\] {
+      --tw-gradient-position: 74.4845deg, ;
+      background-image: linear-gradient(var(--tw-gradient-stops, 74.4845deg));
+    }
+
+    .bg-linear-\\[125deg\\] {
+      --tw-gradient-position: 125deg, ;
+      background-image: linear-gradient(var(--tw-gradient-stops, 125deg));
+    }
+
+    .bg-linear-\\[to_bottom\\] {
+      --tw-gradient-position: to bottom, ;
+      background-image: linear-gradient(var(--tw-gradient-stops, to bottom));
+    }
+
+    .bg-linear-to-b {
+      --tw-gradient-position: to bottom in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-bl {
+      --tw-gradient-position: to bottom left in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-br {
+      --tw-gradient-position: to bottom right in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-l {
+      --tw-gradient-position: to left in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r {
+      --tw-gradient-position: to right in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/\\[in_hsl_longer_hue\\] {
+      --tw-gradient-position: to right in hsl longer hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/\\[longer\\] {
+      --tw-gradient-position: to right longer, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/decreasing {
+      --tw-gradient-position: to right in oklch decreasing hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/hsl {
+      --tw-gradient-position: to right in hsl, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/increasing {
+      --tw-gradient-position: to right in oklch increasing hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/longer {
+      --tw-gradient-position: to right in oklch longer hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/oklab {
+      --tw-gradient-position: to right in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/oklch {
+      --tw-gradient-position: to right in oklch, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/shorter {
+      --tw-gradient-position: to right in oklch shorter hue, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-r\\/srgb {
+      --tw-gradient-position: to right in srgb, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-t {
+      --tw-gradient-position: to top in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-tl {
+      --tw-gradient-position: to top left in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-linear-to-tr {
+      --tw-gradient-position: to top right in oklab, ;
+      background-image: linear-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial-\\[circle_at_center\\] {
+      --tw-gradient-position: circle at center, ;
+      background-image: radial-gradient(var(--tw-gradient-stops, circle at center));
+    }
+
+    .bg-radial\\/\\[in_hsl_longer_hue\\] {
+      --tw-gradient-position: in hsl longer hue, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/decreasing {
+      --tw-gradient-position: in oklch decreasing hue, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/hsl {
+      --tw-gradient-position: in hsl, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/increasing {
+      --tw-gradient-position: in oklch increasing hue, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/longer {
+      --tw-gradient-position: in oklch longer hue, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/oklab {
+      --tw-gradient-position: in oklab, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/oklch {
+      --tw-gradient-position: in oklch, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/shorter {
+      --tw-gradient-position: in oklch shorter hue, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-radial\\/srgb {
+      --tw-gradient-position: in srgb, ;
+      background-image: radial-gradient(var(--tw-gradient-stops));
+    }
+
+    .bg-\\[image\\:var\\(--my-gradient\\)\\] {
       background-image: var(--my-gradient);
     }
 
@@ -9183,80 +10424,8 @@ test('bg', () => {
       background-image: url("/image.png");
     }
 
-    .bg-\\[url\\:--my-url\\] {
+    .bg-\\[url\\:var\\(--my-url\\)\\] {
       background-image: var(--my-url);
-    }
-
-    .bg-gradient-to-b {
-      background-image: linear-gradient(to bottom, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-bl {
-      background-image: linear-gradient(to bottom left, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-br {
-      background-image: linear-gradient(to bottom right, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-l {
-      background-image: linear-gradient(to left, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-r {
-      background-image: linear-gradient(to right, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-t {
-      background-image: linear-gradient(to top, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-tl {
-      background-image: linear-gradient(to top left, var(--tw-gradient-stops, ));
-    }
-
-    .bg-gradient-to-tr {
-      background-image: linear-gradient(to top right, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-\\[1\\.3rad\\] {
-      background-image: linear-gradient(74.4845deg, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-\\[125deg\\] {
-      background-image: linear-gradient(125deg, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-\\[to_bottom\\], .bg-linear-to-b {
-      background-image: linear-gradient(to bottom, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-bl {
-      background-image: linear-gradient(to bottom left, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-br {
-      background-image: linear-gradient(to bottom right, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-l {
-      background-image: linear-gradient(to left, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-r {
-      background-image: linear-gradient(to right, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-t {
-      background-image: linear-gradient(to top, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-tl {
-      background-image: linear-gradient(to top left, var(--tw-gradient-stops, ));
-    }
-
-    .bg-linear-to-tr {
-      background-image: linear-gradient(to top right, var(--tw-gradient-stops, ));
     }
 
     .bg-none {
@@ -9351,24 +10520,24 @@ test('bg', () => {
       background-repeat: repeat;
     }
 
+    .bg-repeat-round {
+      background-repeat: round;
+    }
+
+    .bg-repeat-space {
+      background-repeat: space;
+    }
+
     .bg-repeat-x {
       background-repeat: repeat-x;
     }
 
     .bg-repeat-y {
       background-repeat: repeat-y;
-    }
-
-    .bg-round {
-      background-repeat: round;
-    }
-
-    .bg-space {
-      background-repeat: space;
     }"
   `)
   expect(
-    run([
+    await run([
       'bg',
       'bg-unknown',
 
@@ -9423,31 +10592,13 @@ test('bg', () => {
       '-bg-space',
 
       'bg-none/foo',
-      'bg-gradient-to-t/foo',
-      'bg-gradient-to-tr/foo',
-      'bg-gradient-to-r/foo',
-      'bg-gradient-to-br/foo',
-      'bg-gradient-to-b/foo',
-      'bg-gradient-to-bl/foo',
-      'bg-gradient-to-l/foo',
-      'bg-gradient-to-tl/foo',
-      'bg-linear-to-t/foo',
-      'bg-linear-to-tr/foo',
-      'bg-linear-to-r/foo',
-      'bg-linear-to-br/foo',
-      'bg-linear-to-b/foo',
-      'bg-linear-to-bl/foo',
-      'bg-linear-to-l/foo',
-      'bg-linear-to-tl/foo',
       'bg-[url(/image.png)]/foo',
-      'bg-[url:--my-url]/foo',
+      'bg-[url:var(--my-url)]/foo',
       'bg-[linear-gradient(to_bottom,red,blue)]/foo',
-      'bg-[image:--my-gradient]/foo',
-      'bg-linear-[125deg]/foo',
-      'bg-linear-[1.3rad]/foo',
-      'bg-linear-[to_bottom]/foo',
-      '-bg-linear-[125deg]/foo',
-      '-bg-linear-[1.3rad]/foo',
+      'bg-[image:var(--my-gradient)]/foo',
+      'bg-linear-[to_bottom]/hsl',
+      'bg-conic-[45deg]/hsl',
+      'bg-conic-[circle_at_center]/hsl',
       'bg-auto/foo',
       'bg-cover/foo',
       'bg-contain/foo',
@@ -9481,35 +10632,34 @@ test('bg', () => {
   ).toEqual('')
 
   expect(
-    compileCss(
+    await compileCss(
       css`
-        @theme {
+        @theme reference {
           --opacity-half: 0.5;
           --opacity-custom: var(--custom-opacity);
         }
         @tailwind utilities;
       `,
-      ['bg-current/half', 'bg-current/custom'],
+      ['bg-current/half', 'bg-current/custom', '[color:red]/half'],
     ),
   ).toMatchInlineSnapshot(`
-    ":root {
-      --opacity-half: .5;
-      --opacity-custom: var(--custom-opacity);
-    }
-
-    .bg-current\\/custom {
-      background-color: color-mix(in srgb, currentColor calc(var(--opacity-custom, var(--custom-opacity)) * 100%), transparent);
+    ".bg-current\\/custom {
+      background-color: color-mix(in oklab, currentColor var(--opacity-custom), transparent);
     }
 
     .bg-current\\/half {
-      background-color: color-mix(in srgb, currentColor calc(var(--opacity-half, .5) * 100%), transparent);
+      background-color: color-mix(in oklab, currentColor var(--opacity-half), transparent);
+    }
+
+    .\\[color\\:red\\]\\/half {
+      color: color-mix(in oklab, red var(--opacity-half), transparent);
     }"
   `)
 })
 
-test('from', () => {
+test('from', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -9532,14 +10682,14 @@ test('from', () => {
         'from-[#0088cc]/50',
         'from-[#0088cc]/[0.5]',
         'from-[#0088cc]/[50%]',
-        'from-[--my-color]',
-        'from-[--my-color]/50',
-        'from-[--my-color]/[0.5]',
-        'from-[--my-color]/[50%]',
-        'from-[color:--my-color]',
-        'from-[color:--my-color]/50',
-        'from-[color:--my-color]/[0.5]',
-        'from-[color:--my-color]/[50%]',
+        'from-[var(--my-color)]',
+        'from-[var(--my-color)]/50',
+        'from-[var(--my-color)]/[0.5]',
+        'from-[var(--my-color)]/[50%]',
+        'from-[color:var(--my-color)]',
+        'from-[color:var(--my-color)]/50',
+        'from-[color:var(--my-color)]/[0.5]',
+        'from-[color:var(--my-color)]/[50%]',
 
         // --tw-gradient-from-position
         'from-0%',
@@ -9547,8 +10697,8 @@ test('from', () => {
         'from-100%',
         'from-[50%]',
         'from-[50px]',
-        'from-[length:--my-position]',
-        'from-[percentage:--my-position]',
+        'from-[length:var(--my-position)]',
+        'from-[percentage:var(--my-position)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -9558,62 +10708,62 @@ test('from', () => {
 
     .from-\\[\\#0088cc\\] {
       --tw-gradient-from: #08c;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-\\[\\#0088cc\\]\\/50, .from-\\[\\#0088cc\\]\\/\\[0\\.5\\], .from-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-gradient-from: #0088cc80;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-from: oklab(59.9824% -.06725 -.12414 / .5);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .from-\\[--my-color\\] {
+    .from-\\[color\\:var\\(--my-color\\)\\] {
       --tw-gradient-from: var(--my-color);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .from-\\[--my-color\\]\\/50, .from-\\[--my-color\\]\\/\\[0\\.5\\], .from-\\[--my-color\\]\\/\\[50\\%\\] {
-      --tw-gradient-from: color-mix(in srgb, var(--my-color) 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+    .from-\\[color\\:var\\(--my-color\\)\\]\\/50, .from-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .from-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-gradient-from: color-mix(in oklab, var(--my-color) 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .from-\\[color\\:--my-color\\] {
+    .from-\\[var\\(--my-color\\)\\] {
       --tw-gradient-from: var(--my-color);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .from-\\[color\\:--my-color\\]\\/50, .from-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .from-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      --tw-gradient-from: color-mix(in srgb, var(--my-color) 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+    .from-\\[var\\(--my-color\\)\\]\\/50, .from-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .from-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-gradient-from: color-mix(in oklab, var(--my-color) 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-current {
       --tw-gradient-from: currentColor;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-current\\/50, .from-current\\/\\[0\\.5\\], .from-current\\/\\[50\\%\\] {
-      --tw-gradient-from: color-mix(in srgb, currentColor 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-from: color-mix(in oklab, currentColor 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-inherit {
       --tw-gradient-from: inherit;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-red-500 {
-      --tw-gradient-from: var(--color-red-500, #ef4444);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-from: var(--color-red-500);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-red-500\\/50, .from-red-500\\/\\[0\\.5\\], .from-red-500\\/\\[50\\%\\] {
-      --tw-gradient-from: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-from: color-mix(in oklab, var(--color-red-500) 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-transparent {
       --tw-gradient-from: transparent;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .from-0\\% {
@@ -9636,23 +10786,13 @@ test('from', () => {
       --tw-gradient-from-position: 50px;
     }
 
-    .from-\\[length\\:--my-position\\], .from-\\[percentage\\:--my-position\\] {
+    .from-\\[length\\:var\\(--my-position\\)\\], .from-\\[percentage\\:var\\(--my-position\\)\\] {
       --tw-gradient-from-position: var(--my-position);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-gradient-from: #0000;
-          --tw-gradient-to: #0000;
-          --tw-gradient-via: transparent;
-          --tw-gradient-stops: initial;
-          --tw-gradient-via-stops: initial;
-          --tw-gradient-from-position: 0%;
-          --tw-gradient-via-position: 50%;
-          --tw-gradient-to-position: 100%;
-        }
-      }
+    @property --tw-gradient-position {
+      syntax: "*";
+      inherits: false
     }
 
     @property --tw-gradient-from {
@@ -9661,13 +10801,13 @@ test('from', () => {
       initial-value: #0000;
     }
 
-    @property --tw-gradient-to {
+    @property --tw-gradient-via {
       syntax: "<color>";
       inherits: false;
       initial-value: #0000;
     }
 
-    @property --tw-gradient-via {
+    @property --tw-gradient-to {
       syntax: "<color>";
       inherits: false;
       initial-value: #0000;
@@ -9684,27 +10824,31 @@ test('from', () => {
     }
 
     @property --tw-gradient-from-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 0%;
     }
 
     @property --tw-gradient-via-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 50%;
     }
 
     @property --tw-gradient-to-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 100%;
     }"
   `)
   expect(
-    run([
+    await run([
       'from',
+      'from-25.%',
+      'from-25.0%',
       'from-123',
+      'from--123',
+      'from--5%',
       'from-unknown',
       'from-unknown%',
 
@@ -9732,9 +10876,9 @@ test('from', () => {
   ).toEqual('')
 })
 
-test('via', () => {
+test('via', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -9757,14 +10901,14 @@ test('via', () => {
         'via-[#0088cc]/50',
         'via-[#0088cc]/[0.5]',
         'via-[#0088cc]/[50%]',
-        'via-[--my-color]',
-        'via-[--my-color]/50',
-        'via-[--my-color]/[0.5]',
-        'via-[--my-color]/[50%]',
-        'via-[color:--my-color]',
-        'via-[color:--my-color]/50',
-        'via-[color:--my-color]/[0.5]',
-        'via-[color:--my-color]/[50%]',
+        'via-[var(--my-color)]',
+        'via-[var(--my-color)]/50',
+        'via-[var(--my-color)]/[0.5]',
+        'via-[var(--my-color)]/[50%]',
+        'via-[color:var(--my-color)]',
+        'via-[color:var(--my-color)]/50',
+        'via-[color:var(--my-color)]/[0.5]',
+        'via-[color:var(--my-color)]/[50%]',
 
         // --tw-gradient-via-position
         'via-0%',
@@ -9772,8 +10916,8 @@ test('via', () => {
         'via-100%',
         'via-[50%]',
         'via-[50px]',
-        'via-[length:--my-position]',
-        'via-[percentage:--my-position]',
+        'via-[length:var(--my-position)]',
+        'via-[percentage:var(--my-position)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -9783,73 +10927,73 @@ test('via', () => {
 
     .via-\\[\\#0088cc\\] {
       --tw-gradient-via: #08c;
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-\\[\\#0088cc\\]\\/50, .via-\\[\\#0088cc\\]\\/\\[0\\.5\\], .via-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-gradient-via: #0088cc80;
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via: oklab(59.9824% -.06725 -.12414 / .5);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
-    .via-\\[--my-color\\] {
+    .via-\\[color\\:var\\(--my-color\\)\\] {
       --tw-gradient-via: var(--my-color);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
-    .via-\\[--my-color\\]\\/50, .via-\\[--my-color\\]\\/\\[0\\.5\\], .via-\\[--my-color\\]\\/\\[50\\%\\] {
-      --tw-gradient-via: color-mix(in srgb, var(--my-color) 50%, transparent);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+    .via-\\[color\\:var\\(--my-color\\)\\]\\/50, .via-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .via-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-gradient-via: color-mix(in oklab, var(--my-color) 50%, transparent);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
-    .via-\\[color\\:--my-color\\] {
+    .via-\\[var\\(--my-color\\)\\] {
       --tw-gradient-via: var(--my-color);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
-    .via-\\[color\\:--my-color\\]\\/50, .via-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .via-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      --tw-gradient-via: color-mix(in srgb, var(--my-color) 50%, transparent);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+    .via-\\[var\\(--my-color\\)\\]\\/50, .via-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .via-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-gradient-via: color-mix(in oklab, var(--my-color) 50%, transparent);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-current {
       --tw-gradient-via: currentColor;
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-current\\/50, .via-current\\/\\[0\\.5\\], .via-current\\/\\[50\\%\\] {
-      --tw-gradient-via: color-mix(in srgb, currentColor 50%, transparent);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via: color-mix(in oklab, currentColor 50%, transparent);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-inherit {
       --tw-gradient-via: inherit;
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-red-500 {
-      --tw-gradient-via: var(--color-red-500, #ef4444);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via: var(--color-red-500);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-red-500\\/50, .via-red-500\\/\\[0\\.5\\], .via-red-500\\/\\[50\\%\\] {
-      --tw-gradient-via: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via: color-mix(in oklab, var(--color-red-500) 50%, transparent);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
     .via-transparent {
       --tw-gradient-via: transparent;
-      --tw-gradient-via-stops: var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+      --tw-gradient-via-stops: var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
       --tw-gradient-stops: var(--tw-gradient-via-stops);
     }
 
@@ -9873,23 +11017,13 @@ test('via', () => {
       --tw-gradient-via-position: 50px;
     }
 
-    .via-\\[length\\:--my-position\\], .via-\\[percentage\\:--my-position\\] {
+    .via-\\[length\\:var\\(--my-position\\)\\], .via-\\[percentage\\:var\\(--my-position\\)\\] {
       --tw-gradient-via-position: var(--my-position);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-gradient-from: #0000;
-          --tw-gradient-to: #0000;
-          --tw-gradient-via: transparent;
-          --tw-gradient-stops: initial;
-          --tw-gradient-via-stops: initial;
-          --tw-gradient-from-position: 0%;
-          --tw-gradient-via-position: 50%;
-          --tw-gradient-to-position: 100%;
-        }
-      }
+    @property --tw-gradient-position {
+      syntax: "*";
+      inherits: false
     }
 
     @property --tw-gradient-from {
@@ -9898,13 +11032,13 @@ test('via', () => {
       initial-value: #0000;
     }
 
-    @property --tw-gradient-to {
+    @property --tw-gradient-via {
       syntax: "<color>";
       inherits: false;
       initial-value: #0000;
     }
 
-    @property --tw-gradient-via {
+    @property --tw-gradient-to {
       syntax: "<color>";
       inherits: false;
       initial-value: #0000;
@@ -9921,27 +11055,29 @@ test('via', () => {
     }
 
     @property --tw-gradient-from-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 0%;
     }
 
     @property --tw-gradient-via-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 50%;
     }
 
     @property --tw-gradient-to-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 100%;
     }"
   `)
   expect(
-    run([
+    await run([
       'via',
       'via-123',
+      'via--123',
+      'via--5%',
       'via-unknown',
       'via-unknown%',
 
@@ -9969,9 +11105,9 @@ test('via', () => {
   ).toEqual('')
 })
 
-test('to', () => {
+test('to', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -9994,14 +11130,14 @@ test('to', () => {
         'to-[#0088cc]/50',
         'to-[#0088cc]/[0.5]',
         'to-[#0088cc]/[50%]',
-        'to-[--my-color]',
-        'to-[--my-color]/50',
-        'to-[--my-color]/[0.5]',
-        'to-[--my-color]/[50%]',
-        'to-[color:--my-color]',
-        'to-[color:--my-color]/50',
-        'to-[color:--my-color]/[0.5]',
-        'to-[color:--my-color]/[50%]',
+        'to-[var(--my-color)]',
+        'to-[var(--my-color)]/50',
+        'to-[var(--my-color)]/[0.5]',
+        'to-[var(--my-color)]/[50%]',
+        'to-[color:var(--my-color)]',
+        'to-[color:var(--my-color)]/50',
+        'to-[color:var(--my-color)]/[0.5]',
+        'to-[color:var(--my-color)]/[50%]',
 
         // --tw-gradient-to-position
         'to-0%',
@@ -10009,8 +11145,8 @@ test('to', () => {
         'to-100%',
         'to-[50%]',
         'to-[50px]',
-        'to-[length:--my-position]',
-        'to-[percentage:--my-position]',
+        'to-[length:var(--my-position)]',
+        'to-[percentage:var(--my-position)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -10020,62 +11156,62 @@ test('to', () => {
 
     .to-\\[\\#0088cc\\] {
       --tw-gradient-to: #08c;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-\\[\\#0088cc\\]\\/50, .to-\\[\\#0088cc\\]\\/\\[0\\.5\\], .to-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-gradient-to: #0088cc80;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-to: oklab(59.9824% -.06725 -.12414 / .5);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .to-\\[--my-color\\] {
+    .to-\\[color\\:var\\(--my-color\\)\\] {
       --tw-gradient-to: var(--my-color);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .to-\\[--my-color\\]\\/50, .to-\\[--my-color\\]\\/\\[0\\.5\\], .to-\\[--my-color\\]\\/\\[50\\%\\] {
-      --tw-gradient-to: color-mix(in srgb, var(--my-color) 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+    .to-\\[color\\:var\\(--my-color\\)\\]\\/50, .to-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .to-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-gradient-to: color-mix(in oklab, var(--my-color) 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .to-\\[color\\:--my-color\\] {
+    .to-\\[var\\(--my-color\\)\\] {
       --tw-gradient-to: var(--my-color);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
-    .to-\\[color\\:--my-color\\]\\/50, .to-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .to-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      --tw-gradient-to: color-mix(in srgb, var(--my-color) 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+    .to-\\[var\\(--my-color\\)\\]\\/50, .to-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .to-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-gradient-to: color-mix(in oklab, var(--my-color) 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-current {
       --tw-gradient-to: currentColor;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-current\\/50, .to-current\\/\\[0\\.5\\], .to-current\\/\\[50\\%\\] {
-      --tw-gradient-to: color-mix(in srgb, currentColor 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-to: color-mix(in oklab, currentColor 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-inherit {
       --tw-gradient-to: inherit;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-red-500 {
-      --tw-gradient-to: var(--color-red-500, #ef4444);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-to: var(--color-red-500);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-red-500\\/50, .to-red-500\\/\\[0\\.5\\], .to-red-500\\/\\[50\\%\\] {
-      --tw-gradient-to: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-to: color-mix(in oklab, var(--color-red-500) 50%, transparent);
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-transparent {
       --tw-gradient-to: transparent;
-      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+      --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position, ) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
     }
 
     .to-0\\% {
@@ -10098,23 +11234,13 @@ test('to', () => {
       --tw-gradient-to-position: 50px;
     }
 
-    .to-\\[length\\:--my-position\\], .to-\\[percentage\\:--my-position\\] {
+    .to-\\[length\\:var\\(--my-position\\)\\], .to-\\[percentage\\:var\\(--my-position\\)\\] {
       --tw-gradient-to-position: var(--my-position);
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-gradient-from: #0000;
-          --tw-gradient-to: #0000;
-          --tw-gradient-via: transparent;
-          --tw-gradient-stops: initial;
-          --tw-gradient-via-stops: initial;
-          --tw-gradient-from-position: 0%;
-          --tw-gradient-via-position: 50%;
-          --tw-gradient-to-position: 100%;
-        }
-      }
+    @property --tw-gradient-position {
+      syntax: "*";
+      inherits: false
     }
 
     @property --tw-gradient-from {
@@ -10123,13 +11249,13 @@ test('to', () => {
       initial-value: #0000;
     }
 
-    @property --tw-gradient-to {
+    @property --tw-gradient-via {
       syntax: "<color>";
       inherits: false;
       initial-value: #0000;
     }
 
-    @property --tw-gradient-via {
+    @property --tw-gradient-to {
       syntax: "<color>";
       inherits: false;
       initial-value: #0000;
@@ -10146,27 +11272,29 @@ test('to', () => {
     }
 
     @property --tw-gradient-from-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 0%;
     }
 
     @property --tw-gradient-via-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 50%;
     }
 
     @property --tw-gradient-to-position {
-      syntax: "<length> | <percentage>";
+      syntax: "<length-percentage>";
       inherits: false;
       initial-value: 100%;
     }"
   `)
   expect(
-    run([
+    await run([
       'to',
       'to-123',
+      'to--123',
+      'to--5%',
       'to-unknown',
       'to-unknown%',
 
@@ -10194,8 +11322,8 @@ test('to', () => {
   ).toEqual('')
 })
 
-test('box-decoration', () => {
-  expect(run(['box-decoration-slice', 'box-decoration-clone'])).toMatchInlineSnapshot(`
+test('box-decoration', async () => {
+  expect(await run(['box-decoration-slice', 'box-decoration-clone'])).toMatchInlineSnapshot(`
     ".box-decoration-clone {
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
@@ -10207,7 +11335,7 @@ test('box-decoration', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'box',
       'box-decoration',
       '-box-decoration-slice',
@@ -10218,27 +11346,28 @@ test('box-decoration', () => {
   ).toEqual('')
 })
 
-test('bg-clip', () => {
-  expect(run(['bg-clip-border', 'bg-clip-padding', 'bg-clip-content', 'bg-clip-text']))
+test('bg-clip', async () => {
+  expect(await run(['bg-clip-border', 'bg-clip-padding', 'bg-clip-content', 'bg-clip-text']))
     .toMatchInlineSnapshot(`
-    ".bg-clip-border {
-      background-clip: border-box;
-    }
+      ".bg-clip-border {
+        background-clip: border-box;
+      }
 
-    .bg-clip-content {
-      background-clip: content-box;
-    }
+      .bg-clip-content {
+        background-clip: content-box;
+      }
 
-    .bg-clip-padding {
-      background-clip: padding-box;
-    }
+      .bg-clip-padding {
+        background-clip: padding-box;
+      }
 
-    .bg-clip-text {
-      background-clip: text;
-    }"
-  `)
+      .bg-clip-text {
+        -webkit-background-clip: text;
+        background-clip: text;
+      }"
+    `)
   expect(
-    run([
+    await run([
       'bg-clip',
       '-bg-clip-border',
       '-bg-clip-padding',
@@ -10252,8 +11381,8 @@ test('bg-clip', () => {
   ).toEqual('')
 })
 
-test('bg-origin', () => {
-  expect(run(['bg-origin-border', 'bg-origin-padding', 'bg-origin-content']))
+test('bg-origin', async () => {
+  expect(await run(['bg-origin-border', 'bg-origin-padding', 'bg-origin-content']))
     .toMatchInlineSnapshot(`
     ".bg-origin-border {
       background-origin: border-box;
@@ -10268,7 +11397,7 @@ test('bg-origin', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'bg-origin',
       '-bg-origin-border',
       '-bg-origin-padding',
@@ -10280,9 +11409,9 @@ test('bg-origin', () => {
   ).toEqual('')
 })
 
-test('bg-blend', () => {
+test('bg-blend', async () => {
   expect(
-    run([
+    await run([
       'bg-blend-normal',
       'bg-blend-multiply',
       'bg-blend-screen',
@@ -10366,7 +11495,7 @@ test('bg-blend', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'bg-blend',
       '-bg-blend-normal',
       '-bg-blend-multiply',
@@ -10404,9 +11533,9 @@ test('bg-blend', () => {
   ).toEqual('')
 })
 
-test('mix-blend', () => {
+test('mix-blend', async () => {
   expect(
-    run([
+    await run([
       'mix-blend-normal',
       'mix-blend-multiply',
       'mix-blend-screen',
@@ -10500,7 +11629,7 @@ test('mix-blend', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'mix-blend',
       '-mix-blend-normal',
       '-mix-blend-multiply',
@@ -10541,9 +11670,9 @@ test('mix-blend', () => {
   ).toEqual('')
 })
 
-test('fill', () => {
+test('fill', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -10553,6 +11682,9 @@ test('fill', () => {
       [
         'fill-red-500',
         'fill-red-500/50',
+        'fill-red-500/2.25',
+        'fill-red-500/2.5',
+        'fill-red-500/2.75',
         'fill-red-500/[0.5]',
         'fill-red-500/[50%]',
         'fill-current',
@@ -10577,7 +11709,7 @@ test('fill', () => {
     }
 
     .fill-\\[\\#0088cc\\]\\/50, .fill-\\[\\#0088cc\\]\\/\\[0\\.5\\], .fill-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      fill: #0088cc80;
+      fill: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
     .fill-current {
@@ -10585,7 +11717,7 @@ test('fill', () => {
     }
 
     .fill-current\\/50, .fill-current\\/\\[0\\.5\\], .fill-current\\/\\[50\\%\\] {
-      fill: color-mix(in srgb, currentColor 50%, transparent);
+      fill: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .fill-inherit {
@@ -10593,11 +11725,23 @@ test('fill', () => {
     }
 
     .fill-red-500 {
-      fill: var(--color-red-500, #ef4444);
+      fill: var(--color-red-500);
+    }
+
+    .fill-red-500\\/2\\.5 {
+      fill: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .fill-red-500\\/2\\.25 {
+      fill: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .fill-red-500\\/2\\.75 {
+      fill: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .fill-red-500\\/50, .fill-red-500\\/\\[0\\.5\\], .fill-red-500\\/\\[50\\%\\] {
-      fill: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      fill: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .fill-transparent {
@@ -10605,7 +11749,7 @@ test('fill', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'fill',
       'fill-unknown',
       '-fill-red-500',
@@ -10626,9 +11770,9 @@ test('fill', () => {
   ).toEqual('')
 })
 
-test('stroke', () => {
+test('stroke', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -10639,6 +11783,9 @@ test('stroke', () => {
         // Color
         'stroke-red-500',
         'stroke-red-500/50',
+        'stroke-red-500/2.25',
+        'stroke-red-500/2.5',
+        'stroke-red-500/2.75',
         'stroke-red-500/[0.5]',
         'stroke-red-500/[50%]',
         'stroke-current',
@@ -10651,14 +11798,14 @@ test('stroke', () => {
         'stroke-[#0088cc]/50',
         'stroke-[#0088cc]/[0.5]',
         'stroke-[#0088cc]/[50%]',
-        'stroke-[--my-color]',
-        'stroke-[--my-color]/50',
-        'stroke-[--my-color]/[0.5]',
-        'stroke-[--my-color]/[50%]',
-        'stroke-[color:--my-color]',
-        'stroke-[color:--my-color]/50',
-        'stroke-[color:--my-color]/[0.5]',
-        'stroke-[color:--my-color]/[50%]',
+        'stroke-[var(--my-color)]',
+        'stroke-[var(--my-color)]/50',
+        'stroke-[var(--my-color)]/[0.5]',
+        'stroke-[var(--my-color)]/[50%]',
+        'stroke-[color:var(--my-color)]',
+        'stroke-[color:var(--my-color)]/50',
+        'stroke-[color:var(--my-color)]/[0.5]',
+        'stroke-[color:var(--my-color)]/[50%]',
         'stroke-none',
 
         // Width
@@ -10668,9 +11815,9 @@ test('stroke', () => {
         'stroke-[1.5]',
         'stroke-[12px]',
         'stroke-[50%]',
-        'stroke-[number:--my-width]',
-        'stroke-[length:--my-width]',
-        'stroke-[percentage:--my-width]',
+        'stroke-[number:var(--my-width)]',
+        'stroke-[length:var(--my-width)]',
+        'stroke-[percentage:var(--my-width)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -10683,23 +11830,23 @@ test('stroke', () => {
     }
 
     .stroke-\\[\\#0088cc\\]\\/50, .stroke-\\[\\#0088cc\\]\\/\\[0\\.5\\], .stroke-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      stroke: #0088cc80;
+      stroke: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .stroke-\\[--my-color\\] {
+    .stroke-\\[color\\:var\\(--my-color\\)\\] {
       stroke: var(--my-color);
     }
 
-    .stroke-\\[--my-color\\]\\/50, .stroke-\\[--my-color\\]\\/\\[0\\.5\\], .stroke-\\[--my-color\\]\\/\\[50\\%\\] {
-      stroke: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .stroke-\\[color\\:var\\(--my-color\\)\\]\\/50, .stroke-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .stroke-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      stroke: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
-    .stroke-\\[color\\:--my-color\\] {
+    .stroke-\\[var\\(--my-color\\)\\] {
       stroke: var(--my-color);
     }
 
-    .stroke-\\[color\\:--my-color\\]\\/50, .stroke-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .stroke-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      stroke: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .stroke-\\[var\\(--my-color\\)\\]\\/50, .stroke-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .stroke-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      stroke: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
     .stroke-current {
@@ -10707,7 +11854,7 @@ test('stroke', () => {
     }
 
     .stroke-current\\/50, .stroke-current\\/\\[0\\.5\\], .stroke-current\\/\\[50\\%\\] {
-      stroke: color-mix(in srgb, currentColor 50%, transparent);
+      stroke: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .stroke-inherit {
@@ -10719,11 +11866,23 @@ test('stroke', () => {
     }
 
     .stroke-red-500 {
-      stroke: var(--color-red-500, #ef4444);
+      stroke: var(--color-red-500);
+    }
+
+    .stroke-red-500\\/2\\.5 {
+      stroke: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .stroke-red-500\\/2\\.25 {
+      stroke: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .stroke-red-500\\/2\\.75 {
+      stroke: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .stroke-red-500\\/50, .stroke-red-500\\/\\[0\\.5\\], .stroke-red-500\\/\\[50\\%\\] {
-      stroke: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      stroke: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .stroke-transparent {
@@ -10754,12 +11913,12 @@ test('stroke', () => {
       stroke-width: 50%;
     }
 
-    .stroke-\\[length\\:--my-width\\], .stroke-\\[number\\:--my-width\\], .stroke-\\[percentage\\:--my-width\\] {
+    .stroke-\\[length\\:var\\(--my-width\\)\\], .stroke-\\[number\\:var\\(--my-width\\)\\], .stroke-\\[percentage\\:var\\(--my-width\\)\\] {
       stroke-width: var(--my-width);
     }"
   `)
   expect(
-    run([
+    await run([
       'stroke',
       'stroke-unknown',
 
@@ -10781,13 +11940,14 @@ test('stroke', () => {
 
       // Width
       '-stroke-0',
+      'stroke--1',
     ]),
   ).toEqual('')
 })
 
-test('object', () => {
+test('object', async () => {
   expect(
-    run([
+    await run([
       // object-fit
       'object-contain',
       'object-cover',
@@ -10796,7 +11956,7 @@ test('object', () => {
       'object-scale-down',
 
       // object-position
-      'object-[--value]',
+      'object-[var(--value)]',
       'object-bottom',
       'object-center',
       'object-left',
@@ -10828,7 +11988,7 @@ test('object', () => {
       object-fit: scale-down;
     }
 
-    .object-\\[--value\\] {
+    .object-\\[var\\(--value\\)\\] {
       object-position: var(--value);
     }
 
@@ -10869,7 +12029,7 @@ test('object', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'object',
       // object-fit
       '-object-contain',
@@ -10879,7 +12039,7 @@ test('object', () => {
       '-object-scale-down',
 
       // object-position
-      '-object-[--value]',
+      '-object-[var(--value)]',
       '-object-bottom',
 
       'object-contain/foo',
@@ -10887,7 +12047,7 @@ test('object', () => {
       'object-fill/foo',
       'object-none/foo',
       'object-scale-down/foo',
-      'object-[--value]/foo',
+      'object-[var(--value)]/foo',
       'object-bottom/foo',
       'object-center/foo',
       'object-left/foo',
@@ -10901,256 +12061,379 @@ test('object', () => {
   ).toEqual('')
 })
 
-test('p', () => {
+test('p', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['p-4', 'p-[4px]'],
+      ['p-1', 'p-4', 'p-99', 'p-big', 'p-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .p-1 {
+      padding: calc(var(--spacing) * 1);
     }
 
     .p-4 {
-      padding: var(--spacing-4, 1rem);
+      padding: calc(var(--spacing) * 4);
+    }
+
+    .p-99 {
+      padding: calc(var(--spacing) * 99);
     }
 
     .p-\\[4px\\] {
       padding: 4px;
+    }
+
+    .p-big {
+      padding: var(--spacing-big);
     }"
   `)
-  expect(run(['p', '-p-4', '-p-[4px]', 'p-4/foo', 'p-[4px]/foo'])).toEqual('')
+  expect(await run(['p', '-p-4', '-p-[4px]', 'p-4/foo', 'p-[4px]/foo'])).toEqual('')
 })
 
-test('px', () => {
+test('px', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['px-4', 'px-[4px]'],
+      ['px-1', 'px-99', 'px-2.5', 'px-big', 'px-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
     }
 
-    .px-4 {
-      padding-left: var(--spacing-4, 1rem);
-      padding-right: var(--spacing-4, 1rem);
+    .px-1 {
+      padding-inline: calc(var(--spacing) * 1);
+    }
+
+    .px-2\\.5 {
+      padding-inline: calc(var(--spacing) * 2.5);
+    }
+
+    .px-99 {
+      padding-inline: calc(var(--spacing) * 99);
     }
 
     .px-\\[4px\\] {
-      padding-left: 4px;
-      padding-right: 4px;
+      padding-inline: 4px;
+    }
+
+    .px-big {
+      padding-inline: var(--spacing-big);
     }"
   `)
-  expect(run(['px', '-px-4', '-px-[4px]', 'px-4/foo', 'px-[4px]/foo'])).toEqual('')
+  expect(await run(['px', '-px-4', '-px-[4px]', 'px-4/foo', 'px-[4px]/foo'])).toEqual('')
 })
 
-test('py', () => {
+test('py', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['py-4', 'py-[4px]'],
+      ['py-1', 'py-4', 'py-99', 'py-big', 'py-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .py-1 {
+      padding-block: calc(var(--spacing) * 1);
     }
 
     .py-4 {
-      padding-top: var(--spacing-4, 1rem);
-      padding-bottom: var(--spacing-4, 1rem);
+      padding-block: calc(var(--spacing) * 4);
+    }
+
+    .py-99 {
+      padding-block: calc(var(--spacing) * 99);
     }
 
     .py-\\[4px\\] {
-      padding-top: 4px;
-      padding-bottom: 4px;
+      padding-block: 4px;
+    }
+
+    .py-big {
+      padding-block: var(--spacing-big);
     }"
   `)
-  expect(run(['py', '-py-4', '-py-[4px]', 'py-4/foo', 'py-[4px]/foo'])).toEqual('')
+  expect(await run(['py', '-py-4', '-py-[4px]', 'py-4/foo', 'py-[4px]/foo'])).toEqual('')
 })
 
-test('pt', () => {
+test('pt', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['pt-4', 'pt-[4px]'],
+      ['pt-1', 'pt-4', 'pt-99', 'pt-big', 'pt-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .pt-1 {
+      padding-top: calc(var(--spacing) * 1);
     }
 
     .pt-4 {
-      padding-top: var(--spacing-4, 1rem);
+      padding-top: calc(var(--spacing) * 4);
+    }
+
+    .pt-99 {
+      padding-top: calc(var(--spacing) * 99);
     }
 
     .pt-\\[4px\\] {
       padding-top: 4px;
+    }
+
+    .pt-big {
+      padding-top: var(--spacing-big);
     }"
   `)
-  expect(run(['pt', '-pt-4', '-pt-[4px]', 'pt-4/foo', 'pt-[4px]/foo'])).toEqual('')
+  expect(await run(['pt', '-pt-4', '-pt-[4px]', 'pt-4/foo', 'pt-[4px]/foo'])).toEqual('')
 })
 
-test('ps', () => {
+test('ps', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['ps-4', 'ps-[4px]'],
+      ['ps-1', 'ps-4', 'ps-99', 'ps-big', 'ps-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .ps-1 {
+      padding-inline-start: calc(var(--spacing) * 1);
     }
 
     .ps-4 {
-      padding-inline-start: var(--spacing-4, 1rem);
+      padding-inline-start: calc(var(--spacing) * 4);
+    }
+
+    .ps-99 {
+      padding-inline-start: calc(var(--spacing) * 99);
     }
 
     .ps-\\[4px\\] {
       padding-inline-start: 4px;
+    }
+
+    .ps-big {
+      padding-inline-start: var(--spacing-big);
     }"
   `)
-  expect(run(['ps', '-ps-4', '-ps-[4px]', 'ps-4/foo', 'ps-[4px]/foo'])).toEqual('')
+  expect(await run(['ps', '-ps-4', '-ps-[4px]', 'ps-4/foo', 'ps-[4px]/foo'])).toEqual('')
 })
 
-test('pe', () => {
+test('pe', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['pe-4', 'pe-[4px]'],
+      ['pe-1', 'pe-4', 'pe-99', 'pe-big', 'pe-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .pe-1 {
+      padding-inline-end: calc(var(--spacing) * 1);
     }
 
     .pe-4 {
-      padding-inline-end: var(--spacing-4, 1rem);
+      padding-inline-end: calc(var(--spacing) * 4);
+    }
+
+    .pe-99 {
+      padding-inline-end: calc(var(--spacing) * 99);
     }
 
     .pe-\\[4px\\] {
       padding-inline-end: 4px;
+    }
+
+    .pe-big {
+      padding-inline-end: var(--spacing-big);
     }"
   `)
-  expect(run(['pe', '-pe-4', '-pe-[4px]', 'pe-4/foo', 'pe-[4px]/foo'])).toEqual('')
+  expect(await run(['pe', '-pe-4', '-pe-[4px]', 'pe-4/foo', 'pe-[4px]/foo'])).toEqual('')
 })
 
-test('pr', () => {
+test('pr', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['pr-4', 'pr-[4px]'],
+      ['pr-1', 'pr-4', 'pr-99', 'pr-big', 'pr-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .pr-1 {
+      padding-right: calc(var(--spacing) * 1);
     }
 
     .pr-4 {
-      padding-right: var(--spacing-4, 1rem);
+      padding-right: calc(var(--spacing) * 4);
+    }
+
+    .pr-99 {
+      padding-right: calc(var(--spacing) * 99);
     }
 
     .pr-\\[4px\\] {
       padding-right: 4px;
+    }
+
+    .pr-big {
+      padding-right: var(--spacing-big);
     }"
   `)
-  expect(run(['pr', '-pr-4', '-pr-[4px]', 'pr-4/foo', 'pr-[4px]/foo'])).toEqual('')
+  expect(await run(['pr', '-pr-4', '-pr-[4px]', 'pr-4/foo', 'pr-[4px]/foo'])).toEqual('')
 })
 
-test('pb', () => {
+test('pb', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['pb-4', 'pb-[4px]'],
+      ['pb-1', 'pb-4', 'pb-99', 'pb-big', 'pb-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .pb-1 {
+      padding-bottom: calc(var(--spacing) * 1);
     }
 
     .pb-4 {
-      padding-bottom: var(--spacing-4, 1rem);
+      padding-bottom: calc(var(--spacing) * 4);
+    }
+
+    .pb-99 {
+      padding-bottom: calc(var(--spacing) * 99);
     }
 
     .pb-\\[4px\\] {
       padding-bottom: 4px;
+    }
+
+    .pb-big {
+      padding-bottom: var(--spacing-big);
     }"
   `)
-  expect(run(['pb', '-pb-4', '-pb-[4px]', 'pb-4/foo', 'pb-[4px]/foo'])).toEqual('')
+  expect(await run(['pb', '-pb-4', '-pb-[4px]', 'pb-4/foo', 'pb-[4px]/foo'])).toEqual('')
 })
 
-test('pl', () => {
+test('pl', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --spacing-4: 1rem;
+          --spacing: 0.25rem;
+          --spacing-big: 100rem;
         }
         @tailwind utilities;
       `,
-      ['pl-4', 'pl-[4px]'],
+      ['pl-1', 'pl-4', 'pl-99', 'pl-big', 'pl-[4px]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --spacing-4: 1rem;
+      --spacing: .25rem;
+      --spacing-big: 100rem;
+    }
+
+    .pl-1 {
+      padding-left: calc(var(--spacing) * 1);
     }
 
     .pl-4 {
-      padding-left: var(--spacing-4, 1rem);
+      padding-left: calc(var(--spacing) * 4);
+    }
+
+    .pl-99 {
+      padding-left: calc(var(--spacing) * 99);
     }
 
     .pl-\\[4px\\] {
       padding-left: 4px;
+    }
+
+    .pl-big {
+      padding-left: var(--spacing-big);
     }"
   `)
-  expect(run(['pl', '-pl-4', '-pl-[4px]', 'pl-4/foo', 'pl-[4px]/foo'])).toEqual('')
+  expect(await run(['pl', '-pl-4', '-pl-[4px]', 'pl-4/foo', 'pl-[4px]/foo'])).toEqual('')
 })
 
-test('text-align', () => {
-  expect(run(['text-left', 'text-center', 'text-right', 'text-justify', 'text-start', 'text-end']))
-    .toMatchInlineSnapshot(`
+test('text-align', async () => {
+  expect(
+    await run(['text-left', 'text-center', 'text-right', 'text-justify', 'text-start', 'text-end']),
+  ).toMatchInlineSnapshot(`
     ".text-center {
       text-align: center;
     }
@@ -11176,7 +12459,7 @@ test('text-align', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-text-left',
       '-text-center',
       '-text-right',
@@ -11193,8 +12476,8 @@ test('text-align', () => {
   ).toEqual('')
 })
 
-test('indent', () => {
-  expect(run(['indent-[4px]', '-indent-[4px]'])).toMatchInlineSnapshot(`
+test('indent', async () => {
+  expect(await run(['indent-[4px]', '-indent-[4px]'])).toMatchInlineSnapshot(`
     ".-indent-\\[4px\\] {
       text-indent: -4px;
     }
@@ -11203,12 +12486,12 @@ test('indent', () => {
       text-indent: 4px;
     }"
   `)
-  expect(run(['indent', 'indent-[4px]/foo', '-indent-[4px]/foo'])).toEqual('')
+  expect(await run(['indent', 'indent-[4px]/foo', '-indent-[4px]/foo'])).toEqual('')
 })
 
-test('align', () => {
+test('align', async () => {
   expect(
-    run([
+    await run([
       'align-baseline',
       'align-top',
       'align-middle',
@@ -11218,10 +12501,10 @@ test('align', () => {
       'align-sub',
       'align-super',
 
-      'align-[--value]',
+      'align-[var(--value)]',
     ]),
   ).toMatchInlineSnapshot(`
-    ".align-\\[--value\\] {
+    ".align-\\[var\\(--value\\)\\] {
       vertical-align: var(--value);
     }
 
@@ -11258,7 +12541,7 @@ test('align', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'align',
       '-align-baseline',
       '-align-top',
@@ -11269,7 +12552,7 @@ test('align', () => {
       '-align-sub',
       '-align-super',
 
-      '-align-[--value]',
+      '-align-[var(--value)]',
 
       'align-baseline/foo',
       'align-top/foo',
@@ -11279,18 +12562,19 @@ test('align', () => {
       'align-text-bottom/foo',
       'align-sub/foo',
       'align-super/foo',
-      'align-[--value]/foo',
+      'align-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('font', () => {
+test('font', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --font-family-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-            'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+          --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+            'Segoe UI Symbol', 'Noto Color Emoji';
+          --font-weight-bold: 650;
         }
         @tailwind utilities;
       `,
@@ -11299,26 +12583,27 @@ test('font', () => {
         'font-sans',
         'font-["arial_rounded"]',
         'font-[ui-sans-serif]',
-        'font-[--my-family]',
-        'font-[family-name:--my-family]',
-        'font-[generic-name:--my-family]',
+        'font-[var(--my-family)]',
+        'font-[family-name:var(--my-family)]',
+        'font-[generic-name:var(--my-family)]',
 
         // font-weight
         'font-bold',
         'font-[100]',
-        'font-[number:--my-weight]',
+        'font-[number:var(--my-weight)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --font-family-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      --font-weight-bold: 650;
     }
 
     .font-\\[\\"arial_rounded\\"\\] {
       font-family: arial rounded;
     }
 
-    .font-\\[family-name\\:--my-family\\], .font-\\[generic-name\\:--my-family\\] {
+    .font-\\[family-name\\:var\\(--my-family\\)\\], .font-\\[generic-name\\:var\\(--my-family\\)\\] {
       font-family: var(--my-family);
     }
 
@@ -11327,49 +12612,69 @@ test('font', () => {
     }
 
     .font-sans {
-      font-family: var(--font-family-sans, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
-    }
-
-    .font-\\[--my-family\\] {
-      font-weight: var(--my-family);
+      font-family: var(--font-sans);
     }
 
     .font-\\[100\\] {
+      --tw-font-weight: 100;
       font-weight: 100;
     }
 
-    .font-\\[number\\:--my-weight\\] {
+    .font-\\[number\\:var\\(--my-weight\\)\\] {
+      --tw-font-weight: var(--my-weight);
       font-weight: var(--my-weight);
     }
 
+    .font-\\[var\\(--my-family\\)\\] {
+      --tw-font-weight: var(--my-family);
+      font-weight: var(--my-family);
+    }
+
     .font-bold {
-      font-weight: 700;
+      --tw-font-weight: var(--font-weight-bold);
+      font-weight: var(--font-weight-bold);
+    }
+
+    @property --tw-font-weight {
+      syntax: "*";
+      inherits: false
     }"
   `)
   expect(
-    run([
-      'font',
-      // font-family
-      '-font-sans',
+    await compileCss(
+      css`
+        @theme reference {
+          --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+            'Segoe UI Symbol', 'Noto Color Emoji';
+          --font-weight-bold: 650;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'font',
+        // font-family
+        '-font-sans',
 
-      // font-weight
-      '-font-bold',
+        // font-weight
+        '-font-bold',
 
-      'font-sans/foo',
-      'font-["arial_rounded"]/foo',
-      'font-[ui-sans-serif]/foo',
-      'font-[--my-family]/foo',
-      'font-[family-name:--my-family]/foo',
-      'font-[generic-name:--my-family]/foo',
-      'font-bold/foo',
-      'font-[100]/foo',
-      'font-[number:--my-weight]/foo',
-    ]),
+        'font-weight-bold',
+        'font-sans/foo',
+        'font-["arial_rounded"]/foo',
+        'font-[ui-sans-serif]/foo',
+        'font-[var(--my-family)]/foo',
+        'font-[family-name:var(--my-family)]/foo',
+        'font-[generic-name:var(--my-family)]/foo',
+        'font-bold/foo',
+        'font-[100]/foo',
+        'font-[number:var(--my-weight)]/foo',
+      ],
+    ),
   ).toEqual('')
 })
 
-test('text-transform', () => {
-  expect(run(['uppercase', 'lowercase', 'capitalize', 'normal-case'])).toMatchInlineSnapshot(`
+test('text-transform', async () => {
+  expect(await run(['uppercase', 'lowercase', 'capitalize', 'normal-case'])).toMatchInlineSnapshot(`
     ".capitalize {
       text-transform: capitalize;
     }
@@ -11387,7 +12692,7 @@ test('text-transform', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-uppercase',
       '-lowercase',
       '-capitalize',
@@ -11400,8 +12705,8 @@ test('text-transform', () => {
   ).toEqual('')
 })
 
-test('font-style', () => {
-  expect(run(['italic', 'not-italic'])).toMatchInlineSnapshot(`
+test('font-style', async () => {
+  expect(await run(['italic', 'not-italic'])).toMatchInlineSnapshot(`
     ".italic {
       font-style: italic;
     }
@@ -11410,11 +12715,11 @@ test('font-style', () => {
       font-style: normal;
     }"
   `)
-  expect(run(['-italic', '-not-italic', 'italic/foo', 'not-italic/foo'])).toEqual('')
+  expect(await run(['-italic', '-not-italic', 'italic/foo', 'not-italic/foo'])).toEqual('')
 })
 
-test('font-stretch', () => {
-  expect(run(['font-stretch-ultra-expanded', 'font-stretch-50%', 'font-stretch-200%']))
+test('font-stretch', async () => {
+  expect(await run(['font-stretch-ultra-expanded', 'font-stretch-50%', 'font-stretch-200%']))
     .toMatchInlineSnapshot(`
       ".font-stretch-50\\% {
         font-stretch: 50%;
@@ -11429,11 +12734,12 @@ test('font-stretch', () => {
       }"
     `)
   expect(
-    run([
+    await run([
       'font-stretch',
       'font-stretch-20%',
       'font-stretch-50',
       'font-stretch-400%',
+      'font-stretch-50.5%',
       'font-stretch-potato',
       'font-stretch-ultra-expanded/foo',
       'font-stretch-50%/foo',
@@ -11442,8 +12748,9 @@ test('font-stretch', () => {
   ).toEqual('')
 })
 
-test('text-decoration-line', () => {
-  expect(run(['underline', 'overline', 'line-through', 'no-underline'])).toMatchInlineSnapshot(`
+test('text-decoration-line', async () => {
+  expect(await run(['underline', 'overline', 'line-through', 'no-underline']))
+    .toMatchInlineSnapshot(`
     ".line-through {
       text-decoration-line: line-through;
     }
@@ -11461,7 +12768,7 @@ test('text-decoration-line', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-underline',
       '-overline',
       '-line-through',
@@ -11474,9 +12781,9 @@ test('text-decoration-line', () => {
   ).toEqual('')
 })
 
-test('placeholder', () => {
+test('placeholder', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -11486,6 +12793,9 @@ test('placeholder', () => {
       [
         'placeholder-red-500',
         'placeholder-red-500/50',
+        'placeholder-red-500/2.25',
+        'placeholder-red-500/2.5',
+        'placeholder-red-500/2.75',
         'placeholder-red-500/[0.5]',
         'placeholder-red-500/[50%]',
         'placeholder-current',
@@ -11509,32 +12819,16 @@ test('placeholder', () => {
       color: #08c;
     }
 
-    .placeholder-\\[\\#0088cc\\]\\/50::placeholder {
-      color: #0088cc80;
-    }
-
-    .placeholder-\\[\\#0088cc\\]\\/\\[0\\.5\\]::placeholder {
-      color: #0088cc80;
-    }
-
-    .placeholder-\\[\\#0088cc\\]\\/\\[50\\%\\]::placeholder {
-      color: #0088cc80;
+    .placeholder-\\[\\#0088cc\\]\\/50::placeholder, .placeholder-\\[\\#0088cc\\]\\/\\[0\\.5\\]::placeholder, .placeholder-\\[\\#0088cc\\]\\/\\[50\\%\\]::placeholder {
+      color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
     .placeholder-current::placeholder {
       color: currentColor;
     }
 
-    .placeholder-current\\/50::placeholder {
-      color: color-mix(in srgb, currentColor 50%, transparent);
-    }
-
-    .placeholder-current\\/\\[0\\.5\\]::placeholder {
-      color: color-mix(in srgb, currentColor 50%, transparent);
-    }
-
-    .placeholder-current\\/\\[50\\%\\]::placeholder {
-      color: color-mix(in srgb, currentColor 50%, transparent);
+    .placeholder-current\\/50::placeholder, .placeholder-current\\/\\[0\\.5\\]::placeholder, .placeholder-current\\/\\[50\\%\\]::placeholder {
+      color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .placeholder-inherit::placeholder {
@@ -11542,19 +12836,23 @@ test('placeholder', () => {
     }
 
     .placeholder-red-500::placeholder {
-      color: var(--color-red-500, #ef4444);
+      color: var(--color-red-500);
     }
 
-    .placeholder-red-500\\/50::placeholder {
-      color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+    .placeholder-red-500\\/2\\.5::placeholder {
+      color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
     }
 
-    .placeholder-red-500\\/\\[0\\.5\\]::placeholder {
-      color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+    .placeholder-red-500\\/2\\.25::placeholder {
+      color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
     }
 
-    .placeholder-red-500\\/\\[50\\%\\]::placeholder {
-      color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+    .placeholder-red-500\\/2\\.75::placeholder {
+      color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
+    }
+
+    .placeholder-red-500\\/50::placeholder, .placeholder-red-500\\/\\[0\\.5\\]::placeholder, .placeholder-red-500\\/\\[50\\%\\]::placeholder {
+      color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .placeholder-transparent::placeholder {
@@ -11562,7 +12860,7 @@ test('placeholder', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'placeholder',
       '-placeholder-red-500',
       '-placeholder-red-500/50',
@@ -11582,9 +12880,9 @@ test('placeholder', () => {
   ).toEqual('')
 })
 
-test('decoration', () => {
+test('decoration', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -11607,14 +12905,14 @@ test('decoration', () => {
         'decoration-[#0088cc]/50',
         'decoration-[#0088cc]/[0.5]',
         'decoration-[#0088cc]/[50%]',
-        'decoration-[--my-color]',
-        'decoration-[--my-color]/50',
-        'decoration-[--my-color]/[0.5]',
-        'decoration-[--my-color]/[50%]',
-        'decoration-[color:--my-color]',
-        'decoration-[color:--my-color]/50',
-        'decoration-[color:--my-color]/[0.5]',
-        'decoration-[color:--my-color]/[50%]',
+        'decoration-[var(--my-color)]',
+        'decoration-[var(--my-color)]/50',
+        'decoration-[var(--my-color)]/[0.5]',
+        'decoration-[var(--my-color)]/[50%]',
+        'decoration-[color:var(--my-color)]',
+        'decoration-[color:var(--my-color)]/50',
+        'decoration-[color:var(--my-color)]/[0.5]',
+        'decoration-[color:var(--my-color)]/[50%]',
 
         // text-decoration-style
         'decoration-solid',
@@ -11633,8 +12931,8 @@ test('decoration', () => {
         'decoration-123',
         'decoration-[12px]',
         'decoration-[50%]',
-        'decoration-[length:--my-thickness]',
-        'decoration-[percentage:--my-thickness]',
+        'decoration-[length:var(--my-thickness)]',
+        'decoration-[percentage:var(--my-thickness)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -11647,27 +12945,31 @@ test('decoration', () => {
     }
 
     .decoration-\\[\\#0088cc\\]\\/50, .decoration-\\[\\#0088cc\\]\\/\\[0\\.5\\], .decoration-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      text-decoration-color: #0088cc80;
+      text-decoration-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .decoration-\\[--my-color\\] {
+    .decoration-\\[color\\:var\\(--my-color\\)\\] {
+      -webkit-text-decoration-color: var(--my-color);
       -webkit-text-decoration-color: var(--my-color);
       text-decoration-color: var(--my-color);
     }
 
-    .decoration-\\[--my-color\\]\\/50, .decoration-\\[--my-color\\]\\/\\[0\\.5\\], .decoration-\\[--my-color\\]\\/\\[50\\%\\] {
-      -webkit-text-decoration-color: color-mix(in srgb, var(--my-color) 50%, transparent);
-      text-decoration-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .decoration-\\[color\\:var\\(--my-color\\)\\]\\/50, .decoration-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .decoration-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      -webkit-text-decoration-color: color-mix(in oklab, var(--my-color) 50%, transparent);
+      -webkit-text-decoration-color: color-mix(in oklab, var(--my-color) 50%, transparent);
+      text-decoration-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
-    .decoration-\\[color\\:--my-color\\] {
+    .decoration-\\[var\\(--my-color\\)\\] {
+      -webkit-text-decoration-color: var(--my-color);
       -webkit-text-decoration-color: var(--my-color);
       text-decoration-color: var(--my-color);
     }
 
-    .decoration-\\[color\\:--my-color\\]\\/50, .decoration-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .decoration-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      -webkit-text-decoration-color: color-mix(in srgb, var(--my-color) 50%, transparent);
-      text-decoration-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .decoration-\\[var\\(--my-color\\)\\]\\/50, .decoration-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .decoration-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      -webkit-text-decoration-color: color-mix(in oklab, var(--my-color) 50%, transparent);
+      -webkit-text-decoration-color: color-mix(in oklab, var(--my-color) 50%, transparent);
+      text-decoration-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
     .decoration-current {
@@ -11675,23 +12977,27 @@ test('decoration', () => {
     }
 
     .decoration-current\\/50, .decoration-current\\/\\[0\\.5\\], .decoration-current\\/\\[50\\%\\] {
-      -webkit-text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
-      text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+      -webkit-text-decoration-color: color-mix(in oklab, currentColor 50%, transparent);
+      -webkit-text-decoration-color: color-mix(in oklab, currentColor 50%, transparent);
+      text-decoration-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .decoration-inherit {
+      -webkit-text-decoration-color: inherit;
       -webkit-text-decoration-color: inherit;
       text-decoration-color: inherit;
     }
 
     .decoration-red-500 {
-      -webkit-text-decoration-color: var(--color-red-500, #ef4444);
-      text-decoration-color: var(--color-red-500, #ef4444);
+      -webkit-text-decoration-color: var(--color-red-500);
+      -webkit-text-decoration-color: var(--color-red-500);
+      text-decoration-color: var(--color-red-500);
     }
 
     .decoration-red-500\\/50, .decoration-red-500\\/\\[0\\.5\\], .decoration-red-500\\/\\[50\\%\\] {
-      -webkit-text-decoration-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
-      text-decoration-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      -webkit-text-decoration-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
+      -webkit-text-decoration-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
+      text-decoration-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .decoration-transparent {
@@ -11743,10 +13049,10 @@ test('decoration', () => {
     }
 
     .decoration-\\[50\\%\\] {
-      text-decoration-thickness: calc(1em / 2);
+      text-decoration-thickness: .5em;
     }
 
-    .decoration-\\[length\\:--my-thickness\\], .decoration-\\[percentage\\:--my-thickness\\] {
+    .decoration-\\[length\\:var\\(--my-thickness\\)\\], .decoration-\\[percentage\\:var\\(--my-thickness\\)\\] {
       text-decoration-thickness: var(--my-thickness);
     }
 
@@ -11759,7 +13065,7 @@ test('decoration', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'decoration',
       // text-decoration-color
       '-decoration-red-500',
@@ -11784,6 +13090,7 @@ test('decoration', () => {
       '-decoration-wavy',
 
       // text-decoration-thickness
+      'decoration--2',
       '-decoration-auto',
       '-decoration-from-font',
       '-decoration-0',
@@ -11806,15 +13113,15 @@ test('decoration', () => {
       'decoration-123/foo',
       'decoration-[12px]/foo',
       'decoration-[50%]/foo',
-      'decoration-[length:--my-thickness]/foo',
-      'decoration-[percentage:--my-thickness]/foo',
+      'decoration-[length:var(--my-thickness)]/foo',
+      'decoration-[percentage:var(--my-thickness)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('animate', () => {
+test('animate', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --animate-spin: spin 1s linear infinite;
@@ -11837,11 +13144,11 @@ test('animate', () => {
     }
 
     .animate-spin {
-      animation: var(--animate-spin, spin 1s linear infinite);
+      animation: var(--animate-spin);
     }"
   `)
   expect(
-    run([
+    await run([
       'animate',
       '-animate-spin',
       '-animate-none',
@@ -11855,21 +13162,21 @@ test('animate', () => {
   ).toEqual('')
 })
 
-test('filter', () => {
+test('filter', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --blur-xl: 24px;
-          --drop-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 1px 1px rgb(0 0 0 / 0.06);
-          --drop-shadow-xl: 0 20px 13px rgb(0 0 0 / 0.03), 0 8px 5px rgb(0 0 0 / 0.08);
+          --drop-shadow: 0 1px 1px rgb(0 0 0 / 0.05);
+          --drop-shadow-xl: 0 9px 7px rgb(0 0 0 / 0.1);
         }
         @tailwind utilities;
       `,
       [
         'filter',
         'filter-none',
-        'filter-[--value]',
+        'filter-[var(--value)]',
         'blur-xl',
         'blur-none',
         'blur-[4px]',
@@ -11879,30 +13186,31 @@ test('filter', () => {
         'contrast-[1.23]',
         'grayscale',
         'grayscale-0',
-        'grayscale-[--value]',
+        'grayscale-[var(--value)]',
         'hue-rotate-15',
         'hue-rotate-[45deg]',
         '-hue-rotate-15',
         '-hue-rotate-[45deg]',
         'invert',
         'invert-0',
-        'invert-[--value]',
+        'invert-[var(--value)]',
+        'drop-shadow',
         'drop-shadow-xl',
         'drop-shadow-[0_0_red]',
         'saturate-0',
         'saturate-[1.75]',
-        'saturate-[--value]',
+        'saturate-[var(--value)]',
         'sepia',
         'sepia-0',
         'sepia-[50%]',
-        'sepia-[--value]',
+        'sepia-[var(--value)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --blur-xl: 24px;
-      --drop-shadow: 0 1px 2px #0000001a, 0 1px 1px #0000000f;
-      --drop-shadow-xl: 0 20px 13px #00000008, 0 8px 5px #00000014;
+      --drop-shadow: 0 1px 1px #0000000d;
+      --drop-shadow-xl: 0 9px 7px #0000001a;
     }
 
     .blur-\\[4px\\] {
@@ -11916,7 +13224,7 @@ test('filter', () => {
     }
 
     .blur-xl {
-      --tw-blur: blur(var(--blur-xl, 24px));
+      --tw-blur: blur(var(--blur-xl));
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
@@ -11940,13 +13248,18 @@ test('filter', () => {
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
+    .drop-shadow {
+      --tw-drop-shadow: drop-shadow(var(--drop-shadow));
+      filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
+    }
+
     .drop-shadow-\\[0_0_red\\] {
       --tw-drop-shadow: drop-shadow(0 0 red);
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
     .drop-shadow-xl {
-      --tw-drop-shadow: drop-shadow(var(--drop-shadow-xl, 0 20px 13px #00000008, 0 8px 5px #00000014));
+      --tw-drop-shadow: drop-shadow(var(--drop-shadow-xl));
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
@@ -11960,7 +13273,7 @@ test('filter', () => {
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .grayscale-\\[--value\\] {
+    .grayscale-\\[var\\(--value\\)\\] {
       --tw-grayscale: grayscale(var(--value));
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
@@ -11995,7 +13308,7 @@ test('filter', () => {
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .invert-\\[--value\\] {
+    .invert-\\[var\\(--value\\)\\] {
       --tw-invert: invert(var(--value));
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
@@ -12005,13 +13318,13 @@ test('filter', () => {
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .saturate-\\[--value\\] {
-      --tw-saturate: saturate(var(--value));
+    .saturate-\\[1\\.75\\] {
+      --tw-saturate: saturate(1.75);
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .saturate-\\[1\\.75\\] {
-      --tw-saturate: saturate(1.75);
+    .saturate-\\[var\\(--value\\)\\] {
+      --tw-saturate: saturate(var(--value));
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
@@ -12025,13 +13338,13 @@ test('filter', () => {
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .sepia-\\[--value\\] {
-      --tw-sepia: sepia(var(--value));
+    .sepia-\\[50\\%\\] {
+      --tw-sepia: sepia(50%);
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .sepia-\\[50\\%\\] {
-      --tw-sepia: sepia(50%);
+    .sepia-\\[var\\(--value\\)\\] {
+      --tw-sepia: sepia(var(--value));
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
@@ -12039,28 +13352,12 @@ test('filter', () => {
       filter: var(--tw-blur, ) var(--tw-brightness, ) var(--tw-contrast, ) var(--tw-grayscale, ) var(--tw-hue-rotate, ) var(--tw-invert, ) var(--tw-saturate, ) var(--tw-sepia, ) var(--tw-drop-shadow, );
     }
 
-    .filter-\\[--value\\] {
+    .filter-\\[var\\(--value\\)\\] {
       filter: var(--value);
     }
 
     .filter-none {
       filter: none;
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-blur: initial;
-          --tw-brightness: initial;
-          --tw-contrast: initial;
-          --tw-grayscale: initial;
-          --tw-hue-rotate: initial;
-          --tw-invert: initial;
-          --tw-opacity: initial;
-          --tw-saturate: initial;
-          --tw-sepia: initial;
-        }
-      }
     }
 
     @property --tw-blur {
@@ -12109,41 +13406,48 @@ test('filter', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-filter',
       '-filter-none',
-      '-filter-[--value]',
+      '-filter-[var(--value)]',
       '-blur-xl',
       '-blur-[4px]',
+      'brightness--50',
       '-brightness-50',
       '-brightness-[1.23]',
       'brightness-unknown',
+      'contrast--50',
       '-contrast-50',
       '-contrast-[1.23]',
       'contrast-unknown',
       '-grayscale',
       '-grayscale-0',
-      '-grayscale-[--value]',
+      'grayscale--1',
+      '-grayscale-[var(--value)]',
       'grayscale-unknown',
+      'hue-rotate--5',
       'hue-rotate-unknown',
       '-invert',
+      'invert--5',
       '-invert-0',
-      '-invert-[--value]',
+      '-invert-[var(--value)]',
       'invert-unknown',
       '-drop-shadow-xl',
       '-drop-shadow-[0_0_red]',
       '-saturate-0',
+      'saturate--5',
       '-saturate-[1.75]',
-      '-saturate-[--value]',
+      '-saturate-[var(--value)]',
       'saturate-saturate',
       '-sepia',
+      'sepia--50',
       '-sepia-0',
       '-sepia-[50%]',
-      '-sepia-[--value]',
+      '-sepia-[var(--value)]',
       'sepia-unknown',
       'filter/foo',
       'filter-none/foo',
-      'filter-[--value]/foo',
+      'filter-[var(--value)]/foo',
       'blur-xl/foo',
       'blur-none/foo',
       'blur-[4px]/foo',
@@ -12153,28 +13457,28 @@ test('filter', () => {
       'contrast-[1.23]/foo',
       'grayscale/foo',
       'grayscale-0/foo',
-      'grayscale-[--value]/foo',
+      'grayscale-[var(--value)]/foo',
       'hue-rotate-15/foo',
       'hue-rotate-[45deg]/foo',
       'invert/foo',
       'invert-0/foo',
-      'invert-[--value]/foo',
+      'invert-[var(--value)]/foo',
       'drop-shadow-xl/foo',
       'drop-shadow-[0_0_red]/foo',
       'saturate-0/foo',
       'saturate-[1.75]/foo',
-      'saturate-[--value]/foo',
+      'saturate-[var(--value)]/foo',
       'sepia/foo',
       'sepia-0/foo',
       'sepia-[50%]/foo',
-      'sepia-[--value]/foo',
+      'sepia-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('backdrop-filter', () => {
+test('backdrop-filter', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --blur-xl: 24px;
@@ -12184,7 +13488,7 @@ test('backdrop-filter', () => {
       [
         'backdrop-filter',
         'backdrop-filter-none',
-        'backdrop-filter-[--value]',
+        'backdrop-filter-[var(--value)]',
         'backdrop-blur-none',
         'backdrop-blur-xl',
         'backdrop-blur-[4px]',
@@ -12194,24 +13498,27 @@ test('backdrop-filter', () => {
         'backdrop-contrast-[1.23]',
         'backdrop-grayscale',
         'backdrop-grayscale-0',
-        'backdrop-grayscale-[--value]',
+        'backdrop-grayscale-[var(--value)]',
         'backdrop-hue-rotate-15',
         'backdrop-hue-rotate-[45deg]',
         '-backdrop-hue-rotate-15',
         '-backdrop-hue-rotate-[45deg]',
         'backdrop-invert',
         'backdrop-invert-0',
-        'backdrop-invert-[--value]',
+        'backdrop-invert-[var(--value)]',
         'backdrop-opacity-50',
         'backdrop-opacity-71',
+        'backdrop-opacity-1.25',
+        'backdrop-opacity-2.5',
+        'backdrop-opacity-3.75',
         'backdrop-opacity-[0.5]',
         'backdrop-saturate-0',
         'backdrop-saturate-[1.75]',
-        'backdrop-saturate-[--value]',
+        'backdrop-saturate-[var(--value)]',
         'backdrop-sepia',
         'backdrop-sepia-0',
         'backdrop-sepia-[50%]',
-        'backdrop-sepia-[--value]',
+        'backdrop-sepia-[var(--value)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -12232,7 +13539,7 @@ test('backdrop-filter', () => {
     }
 
     .backdrop-blur-xl {
-      --tw-backdrop-blur: blur(var(--blur-xl, 24px));
+      --tw-backdrop-blur: blur(var(--blur-xl));
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
@@ -12273,7 +13580,7 @@ test('backdrop-filter', () => {
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-grayscale-\\[--value\\] {
+    .backdrop-grayscale-\\[var\\(--value\\)\\] {
       --tw-backdrop-grayscale: grayscale(var(--value));
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
@@ -12315,8 +13622,26 @@ test('backdrop-filter', () => {
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-invert-\\[--value\\] {
+    .backdrop-invert-\\[var\\(--value\\)\\] {
       --tw-backdrop-invert: invert(var(--value));
+      -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+      backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+    }
+
+    .backdrop-opacity-1\\.25 {
+      --tw-backdrop-opacity: opacity(1.25%);
+      -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+      backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+    }
+
+    .backdrop-opacity-2\\.5 {
+      --tw-backdrop-opacity: opacity(2.5%);
+      -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+      backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+    }
+
+    .backdrop-opacity-3\\.75 {
+      --tw-backdrop-opacity: opacity(3.75%);
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
@@ -12345,14 +13670,14 @@ test('backdrop-filter', () => {
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-saturate-\\[--value\\] {
-      --tw-backdrop-saturate: saturate(var(--value));
+    .backdrop-saturate-\\[1\\.75\\] {
+      --tw-backdrop-saturate: saturate(1.75);
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-saturate-\\[1\\.75\\] {
-      --tw-backdrop-saturate: saturate(1.75);
+    .backdrop-saturate-\\[var\\(--value\\)\\] {
+      --tw-backdrop-saturate: saturate(var(--value));
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
@@ -12369,14 +13694,14 @@ test('backdrop-filter', () => {
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-sepia-\\[--value\\] {
-      --tw-backdrop-sepia: sepia(var(--value));
+    .backdrop-sepia-\\[50\\%\\] {
+      --tw-backdrop-sepia: sepia(50%);
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-sepia-\\[50\\%\\] {
-      --tw-backdrop-sepia: sepia(50%);
+    .backdrop-sepia-\\[var\\(--value\\)\\] {
+      --tw-backdrop-sepia: sepia(var(--value));
       -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
@@ -12386,7 +13711,7 @@ test('backdrop-filter', () => {
       backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     }
 
-    .backdrop-filter-\\[--value\\] {
+    .backdrop-filter-\\[var\\(--value\\)\\] {
       -webkit-backdrop-filter: var(--value);
       backdrop-filter: var(--value);
     }
@@ -12394,22 +13719,6 @@ test('backdrop-filter', () => {
     .backdrop-filter-none {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-backdrop-blur: initial;
-          --tw-backdrop-brightness: initial;
-          --tw-backdrop-contrast: initial;
-          --tw-backdrop-grayscale: initial;
-          --tw-backdrop-hue-rotate: initial;
-          --tw-backdrop-invert: initial;
-          --tw-backdrop-opacity: initial;
-          --tw-backdrop-saturate: initial;
-          --tw-backdrop-sepia: initial;
-        }
-      }
     }
 
     @property --tw-backdrop-blur {
@@ -12458,42 +13767,49 @@ test('backdrop-filter', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-backdrop-filter',
       '-backdrop-filter-none',
-      '-backdrop-filter-[--value]',
+      '-backdrop-filter-[var(--value)]',
       '-backdrop-blur-xl',
       '-backdrop-blur-[4px]',
+      'backdrop-brightness--50',
       '-backdrop-brightness-50',
       '-backdrop-brightness-[1.23]',
       'backdrop-brightness-unknown',
+      'backdrop-contrast--50',
       '-backdrop-contrast-50',
       '-backdrop-contrast-[1.23]',
       'backdrop-contrast-unknown',
       '-backdrop-grayscale',
+      'backdrop-grayscale--1',
       '-backdrop-grayscale-0',
-      '-backdrop-grayscale-[--value]',
+      '-backdrop-grayscale-[var(--value)]',
       'backdrop-grayscale-unknown',
       'backdrop-hue-rotate-unknown',
       '-backdrop-invert',
+      'backdrop-invert--1',
       '-backdrop-invert-0',
-      '-backdrop-invert-[--value]',
+      '-backdrop-invert-[var(--value)]',
       'backdrop-invert-unknown',
+      'backdrop-opacity--50',
       '-backdrop-opacity-50',
       '-backdrop-opacity-[0.5]',
       'backdrop-opacity-unknown',
       '-backdrop-saturate-0',
+      'backdrop-saturate--50',
       '-backdrop-saturate-[1.75]',
-      '-backdrop-saturate-[--value]',
+      '-backdrop-saturate-[var(--value)]',
       'backdrop-saturate-unknown',
       '-backdrop-sepia',
+      'backdrop-sepia--50',
       '-backdrop-sepia-0',
       '-backdrop-sepia-[50%]',
-      '-backdrop-sepia-[--value]',
+      '-backdrop-sepia-[var(--value)]',
       'backdrop-sepia-unknown',
       'backdrop-filter/foo',
       'backdrop-filter-none/foo',
-      'backdrop-filter-[--value]/foo',
+      'backdrop-filter-[var(--value)]/foo',
       'backdrop-blur-none/foo',
       'backdrop-blur-xl/foo',
       'backdrop-blur-[4px]/foo',
@@ -12503,29 +13819,30 @@ test('backdrop-filter', () => {
       'backdrop-contrast-[1.23]/foo',
       'backdrop-grayscale/foo',
       'backdrop-grayscale-0/foo',
-      'backdrop-grayscale-[--value]/foo',
+      'backdrop-grayscale-[var(--value)]/foo',
+      'backdrop-hue-rotate--15',
       'backdrop-hue-rotate-15/foo',
       'backdrop-hue-rotate-[45deg]/foo',
       'backdrop-invert/foo',
       'backdrop-invert-0/foo',
-      'backdrop-invert-[--value]/foo',
+      'backdrop-invert-[var(--value)]/foo',
       'backdrop-opacity-50/foo',
       'backdrop-opacity-71/foo',
       'backdrop-opacity-[0.5]/foo',
       'backdrop-saturate-0/foo',
       'backdrop-saturate-[1.75]/foo',
-      'backdrop-saturate-[--value]/foo',
+      'backdrop-saturate-[var(--value)]/foo',
       'backdrop-sepia/foo',
       'backdrop-sepia-0/foo',
       'backdrop-sepia-[50%]/foo',
-      'backdrop-sepia-[--value]/foo',
+      'backdrop-sepia-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('transition', () => {
+test('transition', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --default-transition-timing-function: ease;
@@ -12544,7 +13861,7 @@ test('transition', () => {
         'transition-shadow',
         'transition-colors',
         'transition-opacity',
-        'transition-[--value]',
+        'transition-[var(--value)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -12556,45 +13873,48 @@ test('transition', () => {
     }
 
     .transition {
-      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, -webkit-backdrop-filter, backdrop-filter;
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
-    .transition-\\[--value\\] {
+    .transition-\\[var\\(--value\\)\\] {
       transition-property: var(--value);
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
     .transition-all {
       transition-property: all;
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
     .transition-colors {
-      transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
     .transition-opacity {
       transition-property: opacity;
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
+      transition-property: var(--transition-property-opacity);
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
     .transition-shadow {
       transition-property: box-shadow;
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
     .transition-transform {
       transition-property: transform, translate, scale, rotate;
-      transition-duration: .1s;
-      transition-timing-function: ease;
+      transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+      transition-duration: var(--tw-duration, var(--default-transition-duration));
     }
 
     .transition-none {
@@ -12603,7 +13923,43 @@ test('transition', () => {
   `)
 
   expect(
-    compileCss(
+    await compileCss(
+      css`
+        @theme inline {
+          --default-transition-timing-function: ease;
+          --default-transition-duration: 100ms;
+        }
+        @tailwind utilities;
+      `,
+      ['transition', 'transition-all', 'transition-colors'],
+    ),
+  ).toMatchInlineSnapshot(`
+    ":root {
+      --default-transition-timing-function: ease;
+      --default-transition-duration: .1s;
+    }
+
+    .transition {
+      transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter;
+      transition-timing-function: var(--tw-ease, ease);
+      transition-duration: var(--tw-duration, .1s);
+    }
+
+    .transition-all {
+      transition-property: all;
+      transition-timing-function: var(--tw-ease, ease);
+      transition-duration: var(--tw-duration, .1s);
+    }
+
+    .transition-colors {
+      transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+      transition-timing-function: var(--tw-ease, ease);
+      transition-duration: var(--tw-duration, .1s);
+    }"
+  `)
+
+  expect(
+    await compileCss(
       css`
         @tailwind utilities;
       `,
@@ -12612,18 +13968,18 @@ test('transition', () => {
   ).toMatchInlineSnapshot(`
     ".transition-all {
       transition-property: all;
-      transition-duration: 0s;
-      transition-timing-function: ease;
+      transition-timing-function: var(--tw-ease, ease);
+      transition-duration: var(--tw-duration, 0s);
     }"
   `)
 
   expect(
-    run([
+    await run([
       '-transition',
       '-transition-none',
       '-transition-all',
       '-transition-opacity',
-      '-transition-[--value]',
+      '-transition-[var(--value)]',
       'transition/foo',
       'transition-none/foo',
       'transition-all/foo',
@@ -12631,13 +13987,27 @@ test('transition', () => {
       'transition-shadow/foo',
       'transition-colors/foo',
       'transition-opacity/foo',
-      'transition-[--value]/foo',
+      'transition-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('delay', () => {
-  expect(run(['delay-123', 'delay-200', 'delay-[300ms]'])).toMatchInlineSnapshot(`
+test('transition-behavior', async () => {
+  expect(await run(['transition-discrete', 'transition-normal'])).toMatchInlineSnapshot(`
+    ".transition-discrete {
+      transition-behavior: allow-discrete;
+    }
+
+    .transition-normal {
+      transition-behavior: normal;
+    }"
+  `)
+
+  expect(await run(['-transition-discrete', '-transition-normal'])).toEqual('')
+})
+
+test('delay', async () => {
+  expect(await run(['delay-123', 'delay-200', 'delay-[300ms]'])).toMatchInlineSnapshot(`
     ".delay-123 {
       transition-delay: .123s;
     }
@@ -12651,8 +14021,9 @@ test('delay', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'delay',
+      'delay--200',
       '-delay-200',
       '-delay-[300ms]',
       'delay-unknown',
@@ -12663,23 +14034,32 @@ test('delay', () => {
   ).toEqual('')
 })
 
-test('duration', () => {
-  expect(run(['duration-123', 'duration-200', 'duration-[300ms]'])).toMatchInlineSnapshot(`
+test('duration', async () => {
+  expect(await run(['duration-123', 'duration-200', 'duration-[300ms]'])).toMatchInlineSnapshot(`
     ".duration-123 {
+      --tw-duration: .123s;
       transition-duration: .123s;
     }
 
     .duration-200 {
+      --tw-duration: .2s;
       transition-duration: .2s;
     }
 
     .duration-\\[300ms\\] {
+      --tw-duration: .3s;
       transition-duration: .3s;
+    }
+
+    @property --tw-duration {
+      syntax: "*";
+      inherits: false
     }"
   `)
   expect(
-    run([
+    await run([
       'duration',
+      'duration--200',
       '-duration-200',
       '-duration-[300ms]',
       'duration-123/foo',
@@ -12689,59 +14069,67 @@ test('duration', () => {
   ).toEqual('')
 })
 
-test('ease', () => {
+test('ease', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --transition-timing-function-in: cubic-bezier(0.4, 0, 1, 1);
-          --transition-timing-function-out: cubic-bezier(0, 0, 0.2, 1);
+          --ease-in: cubic-bezier(0.4, 0, 1, 1);
+          --ease-out: cubic-bezier(0, 0, 0.2, 1);
         }
         @tailwind utilities;
       `,
-      ['ease-in', 'ease-out', 'ease-[--value]'],
+      ['ease-in', 'ease-out', 'ease-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --transition-timing-function-in: cubic-bezier(.4, 0, 1, 1);
-      --transition-timing-function-out: cubic-bezier(0, 0, .2, 1);
+      --ease-in: cubic-bezier(.4, 0, 1, 1);
+      --ease-out: cubic-bezier(0, 0, .2, 1);
     }
 
-    .ease-\\[--value\\] {
+    .ease-\\[var\\(--value\\)\\] {
+      --tw-ease: var(--value);
       transition-timing-function: var(--value);
     }
 
     .ease-in {
-      transition-timing-function: var(--transition-timing-function-in, cubic-bezier(.4, 0, 1, 1));
+      --tw-ease: var(--ease-in);
+      transition-timing-function: var(--ease-in);
     }
 
     .ease-out {
-      transition-timing-function: var(--transition-timing-function-out, cubic-bezier(0, 0, .2, 1));
+      --tw-ease: var(--ease-out);
+      transition-timing-function: var(--ease-out);
+    }
+
+    @property --tw-ease {
+      syntax: "*";
+      inherits: false
     }"
   `)
   expect(
-    run([
+    await run([
       '-ease-in',
       '-ease-out',
-      '-ease-[--value]',
+      '-ease-[var(--value)]',
       'ease-in/foo',
       'ease-out/foo',
-      'ease-[--value]/foo',
+      'ease-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('will-change', () => {
+test('will-change', async () => {
   expect(
-    run([
+    await run([
       'will-change-auto',
       'will-change-contents',
       'will-change-transform',
       'will-change-scroll',
-      'will-change-[--value]',
+      'will-change-[var(--value)]',
     ]),
   ).toMatchInlineSnapshot(`
-    ".will-change-\\[--value\\] {
+    ".will-change-\\[var\\(--value\\)\\] {
       will-change: var(--value);
     }
 
@@ -12762,25 +14150,25 @@ test('will-change', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'will-change',
       '-will-change-auto',
       '-will-change-contents',
       '-will-change-transform',
       '-will-change-scroll',
-      '-will-change-[--value]',
+      '-will-change-[var(--value)]',
       'will-change-auto/foo',
       'will-change-contents/foo',
       'will-change-transform/foo',
       'will-change-scroll/foo',
-      'will-change-[--value]/foo',
+      'will-change-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('contain', () => {
+test('contain', async () => {
   expect(
-    run([
+    await run([
       'contain-none',
       'contain-content',
       'contain-strict',
@@ -12833,17 +14221,6 @@ test('contain', () => {
       contain: var(--tw-contain-size, ) var(--tw-contain-layout, ) var(--tw-contain-paint, ) var(--tw-contain-style, );
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-contain-size: initial;
-          --tw-contain-layout: initial;
-          --tw-contain-paint: initial;
-          --tw-contain-style: initial;
-        }
-      }
-    }
-
     @property --tw-contain-size {
       syntax: "*";
       inherits: false
@@ -12865,7 +14242,7 @@ test('contain', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'contain-none/foo',
       'contain-content/foo',
       'contain-strict/foo',
@@ -12879,19 +14256,11 @@ test('contain', () => {
   ).toEqual('')
 })
 
-test('content', () => {
-  expect(run(['content-["hello_world"]'])).toMatchInlineSnapshot(`
+test('content', async () => {
+  expect(await run(['content-["hello_world"]'])).toMatchInlineSnapshot(`
     ".content-\\[\\"hello_world\\"\\] {
       --tw-content: "hello world";
       content: var(--tw-content);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-content: "";
-        }
-      }
     }
 
     @property --tw-content {
@@ -12900,11 +14269,14 @@ test('content', () => {
       initial-value: "";
     }"
   `)
-  expect(run(['content', '-content-["hello_world"]', 'content-["hello_world"]/foo'])).toEqual('')
+  expect(await run(['content', '-content-["hello_world"]', 'content-["hello_world"]/foo'])).toEqual(
+    '',
+  )
 })
 
-test('forced-color-adjust', () => {
-  expect(run(['forced-color-adjust-none', 'forced-color-adjust-auto'])).toMatchInlineSnapshot(`
+test('forced-color-adjust', async () => {
+  expect(await run(['forced-color-adjust-none', 'forced-color-adjust-auto']))
+    .toMatchInlineSnapshot(`
     ".forced-color-adjust-auto {
       forced-color-adjust: auto;
     }
@@ -12914,7 +14286,7 @@ test('forced-color-adjust', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'forced',
       'forced-color',
       'forced-color-adjust',
@@ -12926,96 +14298,113 @@ test('forced-color-adjust', () => {
   ).toEqual('')
 })
 
-test('leading', () => {
+test('leading', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --line-height-none: 1;
-          --line-height-6: 1.5rem;
+          --leading-tight: 1.25;
+          --leading-6: 1.5rem;
         }
         @tailwind utilities;
       `,
-      ['leading-none', 'leading-6', 'leading-[--value]'],
+      ['leading-tight', 'leading-6', 'leading-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --line-height-none: 1;
-      --line-height-6: 1.5rem;
+      --leading-tight: 1.25;
+      --leading-6: 1.5rem;
     }
 
     .leading-6 {
-      line-height: var(--line-height-6, 1.5rem);
+      --tw-leading: var(--leading-6);
+      line-height: var(--leading-6);
     }
 
-    .leading-\\[--value\\] {
+    .leading-\\[var\\(--value\\)\\] {
+      --tw-leading: var(--value);
       line-height: var(--value);
     }
 
-    .leading-none {
-      line-height: var(--line-height-none, 1);
+    .leading-tight {
+      --tw-leading: var(--leading-tight);
+      line-height: var(--leading-tight);
+    }
+
+    @property --tw-leading {
+      syntax: "*";
+      inherits: false
     }"
   `)
   expect(
-    run([
+    await run([
       'leading',
-      '-leading-none',
+      '-leading-tight',
       '-leading-6',
-      '-leading-[--value]',
-      'leading-none/foo',
+      '-leading-[var(--value)]',
+      'leading-tight/foo',
       'leading-6/foo',
-      'leading-[--value]/foo',
+      'leading-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('tracking', () => {
+test('tracking', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
-          --letter-spacing-normal: 0em;
-          --letter-spacing-wide: 0.025em;
+          --tracking-normal: 0em;
+          --tracking-wide: 0.025em;
         }
         @tailwind utilities;
       `,
-      ['tracking-normal', 'tracking-wide', 'tracking-[--value]', '-tracking-[--value]'],
+      ['tracking-normal', 'tracking-wide', 'tracking-[var(--value)]', '-tracking-[var(--value)]'],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
-      --letter-spacing-normal: 0em;
-      --letter-spacing-wide: .025em;
+      --tracking-normal: 0em;
+      --tracking-wide: .025em;
     }
 
-    .-tracking-\\[--value\\] {
+    .-tracking-\\[var\\(--value\\)\\] {
+      --tw-tracking: calc(var(--value) * -1);
       letter-spacing: calc(var(--value) * -1);
     }
 
-    .tracking-\\[--value\\] {
+    .tracking-\\[var\\(--value\\)\\] {
+      --tw-tracking: var(--value);
       letter-spacing: var(--value);
     }
 
     .tracking-normal {
-      letter-spacing: var(--letter-spacing-normal, 0em);
+      --tw-tracking: var(--tracking-normal);
+      letter-spacing: var(--tracking-normal);
     }
 
     .tracking-wide {
-      letter-spacing: var(--letter-spacing-wide, .025em);
+      --tw-tracking: var(--tracking-wide);
+      letter-spacing: var(--tracking-wide);
+    }
+
+    @property --tw-tracking {
+      syntax: "*";
+      inherits: false
     }"
   `)
   expect(
-    run([
+    await run([
       'tracking',
       'tracking-normal/foo',
       'tracking-wide/foo',
-      'tracking-[--value]/foo',
-      '-tracking-[--value]/foo',
+      'tracking-[var(--value)]/foo',
+      '-tracking-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('font-smoothing', () => {
-  expect(run(['antialiased', 'subpixel-antialiased'])).toMatchInlineSnapshot(`
+test('font-smoothing', async () => {
+  expect(await run(['antialiased', 'subpixel-antialiased'])).toMatchInlineSnapshot(`
     ".antialiased {
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
@@ -13027,13 +14416,18 @@ test('font-smoothing', () => {
     }"
   `)
   expect(
-    run(['-antialiased', '-subpixel-antialiased', 'antialiased/foo', 'subpixel-antialiased/foo']),
+    await run([
+      '-antialiased',
+      '-subpixel-antialiased',
+      'antialiased/foo',
+      'subpixel-antialiased/foo',
+    ]),
   ).toEqual('')
 })
 
-test('font-variant-numeric', () => {
+test('font-variant-numeric', async () => {
   expect(
-    run([
+    await run([
       'normal-nums',
       'ordinal',
       'slashed-zero',
@@ -13089,18 +14483,6 @@ test('font-variant-numeric', () => {
       font-variant-numeric: var(--tw-ordinal, ) var(--tw-slashed-zero, ) var(--tw-numeric-figure, ) var(--tw-numeric-spacing, ) var(--tw-numeric-fraction, );
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-ordinal: initial;
-          --tw-slashed-zero: initial;
-          --tw-numeric-figure: initial;
-          --tw-numeric-spacing: initial;
-          --tw-numeric-fraction: initial;
-        }
-      }
-    }
-
     @property --tw-ordinal {
       syntax: "*";
       inherits: false
@@ -13127,7 +14509,7 @@ test('font-variant-numeric', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-normal-nums',
       '-ordinal',
       '-slashed-zero',
@@ -13150,9 +14532,9 @@ test('font-variant-numeric', () => {
   ).toEqual('')
 })
 
-test('outline', () => {
+test('outline', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -13161,6 +14543,7 @@ test('outline', () => {
       `,
       [
         'outline',
+        'outline-hidden',
 
         // outline-style
         'outline-none',
@@ -13188,23 +14571,23 @@ test('outline', () => {
         'outline-[black]/50',
         'outline-[black]/[0.5]',
         'outline-[black]/[50%]',
-        'outline-[--value]',
-        'outline-[--value]/50',
-        'outline-[--value]/[0.5]',
-        'outline-[--value]/[50%]',
-        'outline-[color:--value]',
-        'outline-[color:--value]/50',
-        'outline-[color:--value]/[0.5]',
-        'outline-[color:--value]/[50%]',
+        'outline-[var(--value)]',
+        'outline-[var(--value)]/50',
+        'outline-[var(--value)]/[0.5]',
+        'outline-[var(--value)]/[50%]',
+        'outline-[color:var(--value)]',
+        'outline-[color:var(--value)]/50',
+        'outline-[color:var(--value)]/[0.5]',
+        'outline-[color:var(--value)]/[50%]',
 
         // outline-width
         'outline-0',
         'outline-[1.5]',
         'outline-[12px]',
         'outline-[50%]',
-        'outline-[number:--my-width]',
-        'outline-[length:--my-width]',
-        'outline-[percentage:--my-width]',
+        'outline-[number:var(--my-width)]',
+        'outline-[length:var(--my-width)]',
+        'outline-[percentage:var(--my-width)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -13212,9 +14595,15 @@ test('outline', () => {
       --color-red-500: #ef4444;
     }
 
-    .outline-none {
-      outline-offset: 2px;
-      outline: 2px solid #0000;
+    .outline-hidden {
+      outline-style: none;
+    }
+
+    @media (forced-colors: active) {
+      .outline-hidden {
+        outline-offset: 2px;
+        outline: 2px solid #0000;
+      }
     }
 
     .outline {
@@ -13242,7 +14631,7 @@ test('outline', () => {
       outline-width: 50%;
     }
 
-    .outline-\\[length\\:--my-width\\], .outline-\\[number\\:--my-width\\], .outline-\\[percentage\\:--my-width\\] {
+    .outline-\\[length\\:var\\(--my-width\\)\\], .outline-\\[number\\:var\\(--my-width\\)\\], .outline-\\[percentage\\:var\\(--my-width\\)\\] {
       outline-style: var(--tw-outline-style);
       outline-width: var(--my-width);
     }
@@ -13252,31 +14641,39 @@ test('outline', () => {
     }
 
     .outline-\\[\\#0088cc\\]\\/50, .outline-\\[\\#0088cc\\]\\/\\[0\\.5\\], .outline-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      outline-color: #0088cc80;
-    }
-
-    .outline-\\[--value\\] {
-      outline-color: var(--value);
-    }
-
-    .outline-\\[--value\\]\\/50, .outline-\\[--value\\]\\/\\[0\\.5\\], .outline-\\[--value\\]\\/\\[50\\%\\] {
-      outline-color: color-mix(in srgb, var(--value) 50%, transparent);
+      outline-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
     .outline-\\[black\\] {
       outline-color: #000;
     }
 
-    .outline-\\[black\\]\\/50, .outline-\\[black\\]\\/\\[0\\.5\\], .outline-\\[black\\]\\/\\[50\\%\\] {
-      outline-color: #00000080;
+    .outline-\\[black\\]\\/50 {
+      outline-color: oklab(0% none none / .5);
     }
 
-    .outline-\\[color\\:--value\\] {
+    .outline-\\[black\\]\\/\\[0\\.5\\] {
+      outline-color: oklab(0% none none / .5);
+    }
+
+    .outline-\\[black\\]\\/\\[50\\%\\] {
+      outline-color: oklab(0% none none / .5);
+    }
+
+    .outline-\\[color\\:var\\(--value\\)\\] {
       outline-color: var(--value);
     }
 
-    .outline-\\[color\\:--value\\]\\/50, .outline-\\[color\\:--value\\]\\/\\[0\\.5\\], .outline-\\[color\\:--value\\]\\/\\[50\\%\\] {
-      outline-color: color-mix(in srgb, var(--value) 50%, transparent);
+    .outline-\\[color\\:var\\(--value\\)\\]\\/50, .outline-\\[color\\:var\\(--value\\)\\]\\/\\[0\\.5\\], .outline-\\[color\\:var\\(--value\\)\\]\\/\\[50\\%\\] {
+      outline-color: color-mix(in oklab, var(--value) 50%, transparent);
+    }
+
+    .outline-\\[var\\(--value\\)\\] {
+      outline-color: var(--value);
+    }
+
+    .outline-\\[var\\(--value\\)\\]\\/50, .outline-\\[var\\(--value\\)\\]\\/\\[0\\.5\\], .outline-\\[var\\(--value\\)\\]\\/\\[50\\%\\] {
+      outline-color: color-mix(in oklab, var(--value) 50%, transparent);
     }
 
     .outline-current {
@@ -13284,7 +14681,7 @@ test('outline', () => {
     }
 
     .outline-current\\/50, .outline-current\\/\\[0\\.5\\], .outline-current\\/\\[50\\%\\] {
-      outline-color: color-mix(in srgb, currentColor 50%, transparent);
+      outline-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .outline-inherit {
@@ -13292,11 +14689,11 @@ test('outline', () => {
     }
 
     .outline-red-500 {
-      outline-color: var(--color-red-500, #ef4444);
+      outline-color: var(--color-red-500);
     }
 
     .outline-red-500\\/50, .outline-red-500\\/\\[0\\.5\\], .outline-red-500\\/\\[50\\%\\] {
-      outline-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      outline-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .outline-transparent {
@@ -13318,27 +14715,24 @@ test('outline', () => {
       outline-style: double;
     }
 
+    .outline-none {
+      --tw-outline-style: none;
+      outline-style: none;
+    }
+
     .outline-solid {
       --tw-outline-style: solid;
       outline-style: solid;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-outline-style: solid;
-        }
-      }
-    }
-
     @property --tw-outline-style {
-      syntax: "<custom-ident>";
+      syntax: "*";
       inherits: false;
       initial-value: solid;
     }"
   `)
   expect(
-    run([
+    await run([
       '-outline',
 
       // outline-style
@@ -13366,6 +14760,7 @@ test('outline', () => {
 
       // outline-width
       '-outline-0',
+      'outline--10',
 
       'outline/foo',
       'outline-none/foo',
@@ -13377,20 +14772,20 @@ test('outline', () => {
   ).toEqual('')
 })
 
-test('outline-offset', () => {
+test('outline-offset', async () => {
   expect(
-    run([
+    await run([
       'outline-offset-4',
       '-outline-offset-4',
-      'outline-offset-[--value]',
-      '-outline-offset-[--value]',
+      'outline-offset-[var(--value)]',
+      '-outline-offset-[var(--value)]',
     ]),
   ).toMatchInlineSnapshot(`
     ".-outline-offset-4 {
       outline-offset: calc(4px * -1);
     }
 
-    .-outline-offset-\\[--value\\] {
+    .-outline-offset-\\[var\\(--value\\)\\] {
       outline-offset: calc(var(--value) * -1);
     }
 
@@ -13398,47 +14793,70 @@ test('outline-offset', () => {
       outline-offset: 4px;
     }
 
-    .outline-offset-\\[--value\\] {
+    .outline-offset-\\[var\\(--value\\)\\] {
       outline-offset: var(--value);
     }"
   `)
   expect(
-    run([
+    await run([
       'outline-offset',
+      'outline-offset--4',
       'outline-offset-unknown',
       'outline-offset-4/foo',
       '-outline-offset-4/foo',
-      'outline-offset-[--value]/foo',
-      '-outline-offset-[--value]/foo',
+      'outline-offset-[var(--value)]/foo',
+      '-outline-offset-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('opacity', () => {
-  expect(run(['opacity-15', 'opacity-[--value]'])).toMatchInlineSnapshot(`
-    ".opacity-15 {
+test('opacity', async () => {
+  expect(
+    await run([
+      'opacity-15',
+      'opacity-2.5',
+      'opacity-3.25',
+      'opacity-4.75',
+      'opacity-[var(--value)]',
+    ]),
+  ).toMatchInlineSnapshot(`
+    ".opacity-2\\.5 {
+      opacity: .025;
+    }
+
+    .opacity-3\\.25 {
+      opacity: .0325;
+    }
+
+    .opacity-4\\.75 {
+      opacity: .0475;
+    }
+
+    .opacity-15 {
       opacity: .15;
     }
 
-    .opacity-\\[--value\\] {
+    .opacity-\\[var\\(--value\\)\\] {
       opacity: var(--value);
     }"
   `)
   expect(
-    run([
+    await run([
       'opacity',
+      'opacity--15',
+      'opacity-1.125',
       '-opacity-15',
-      '-opacity-[--value]',
+      '-opacity-[var(--value)]',
       'opacity-unknown',
       'opacity-15/foo',
-      'opacity-[--value]/foo',
+      'opacity-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('underline-offset', () => {
+test('underline-offset', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
         }
@@ -13450,8 +14868,8 @@ test('underline-offset', () => {
         '-underline-offset-4',
         'underline-offset-123',
         '-underline-offset-123',
-        'underline-offset-[--value]',
-        '-underline-offset-[--value]',
+        'underline-offset-[var(--value)]',
+        '-underline-offset-[var(--value)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -13463,7 +14881,7 @@ test('underline-offset', () => {
       text-underline-offset: calc(123px * -1);
     }
 
-    .-underline-offset-\\[--value\\] {
+    .-underline-offset-\\[var\\(--value\\)\\] {
       text-underline-offset: calc(var(--value) * -1);
     }
 
@@ -13475,7 +14893,7 @@ test('underline-offset', () => {
       text-underline-offset: 123px;
     }
 
-    .underline-offset-\\[--value\\] {
+    .underline-offset-\\[var\\(--value\\)\\] {
       text-underline-offset: var(--value);
     }
 
@@ -13484,8 +14902,9 @@ test('underline-offset', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'underline-offset',
+      'underline-offset--4',
       '-underline-offset-auto',
       'underline-offset-unknown',
       'underline-offset-auto/foo',
@@ -13493,22 +14912,22 @@ test('underline-offset', () => {
       '-underline-offset-4/foo',
       'underline-offset-123/foo',
       '-underline-offset-123/foo',
-      'underline-offset-[--value]/foo',
-      '-underline-offset-[--value]/foo',
+      'underline-offset-[var(--value)]/foo',
+      '-underline-offset-[var(--value)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('text', () => {
+test('text', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
+          --spacing: 0.25rem;
           --color-red-500: #ef4444;
-          --line-height-6: 1.5rem;
-          --font-size-sm: 0.875rem;
-          --font-size-sm--line-height: 1.25rem;
-          --line-height-9: 2.25rem;
+          --text-sm: 0.875rem;
+          --text-sm--line-height: 1.25rem;
+          --leading-snug: 1.375;
         }
         @tailwind utilities;
       `,
@@ -13516,6 +14935,9 @@ test('text', () => {
         // color
         'text-red-500',
         'text-red-500/50',
+        'text-red-500/2.25',
+        'text-red-500/2.5',
+        'text-red-500/2.75',
         'text-red-500/[0.5]',
         'text-red-500/[50%]',
         'text-current',
@@ -13529,18 +14951,21 @@ test('text', () => {
         'text-[#0088cc]/[0.5]',
         'text-[#0088cc]/[50%]',
 
-        'text-[--my-color]',
-        'text-[--my-color]/50',
-        'text-[--my-color]/[0.5]',
-        'text-[--my-color]/[50%]',
-        'text-[color:--my-color]',
-        'text-[color:--my-color]/50',
-        'text-[color:--my-color]/[0.5]',
-        'text-[color:--my-color]/[50%]',
+        'text-[var(--my-color)]',
+        'text-[var(--my-color)]/50',
+        'text-[var(--my-color)]/[0.5]',
+        'text-[var(--my-color)]/[50%]',
+        'text-[color:var(--my-color)]',
+        'text-[color:var(--my-color)]/50',
+        'text-[color:var(--my-color)]/[0.5]',
+        'text-[color:var(--my-color)]/[50%]',
 
         // font-size / line-height / letter-spacing / font-weight
         'text-sm',
         'text-sm/6',
+        'text-sm/none',
+        'text-[10px]/none',
+        'text-sm/snug',
         'text-sm/[4px]',
         'text-[12px]',
         'text-[12px]/6',
@@ -13550,10 +14975,10 @@ test('text', () => {
         'text-[xx-large]/6',
         'text-[larger]',
         'text-[larger]/6',
-        'text-[length:--my-size]',
-        'text-[percentage:--my-size]',
-        'text-[absolute-size:--my-size]',
-        'text-[relative-size:--my-size]',
+        'text-[length:var(--my-size)]',
+        'text-[percentage:var(--my-size)]',
+        'text-[absolute-size:var(--my-size)]',
+        'text-[relative-size:var(--my-size)]',
         'text-[clamp(1rem,2rem,3rem)]',
         'text-[clamp(1rem,var(--size),3rem)]',
         'text-[clamp(1rem,var(--size),3rem)]/9',
@@ -13561,51 +14986,66 @@ test('text', () => {
     ),
   ).toMatchInlineSnapshot(`
     ":root {
+      --spacing: .25rem;
       --color-red-500: #ef4444;
-      --line-height-6: 1.5rem;
-      --font-size-sm: .875rem;
-      --font-size-sm--line-height: 1.25rem;
-      --line-height-9: 2.25rem;
+      --text-sm: .875rem;
+      --text-sm--line-height: 1.25rem;
+      --leading-snug: 1.375;
     }
 
     .text-sm {
-      font-size: var(--font-size-sm, .875rem);
-      line-height: var(--font-size-sm--line-height, 1.25rem);
+      font-size: var(--text-sm);
+      line-height: var(--tw-leading, var(--text-sm--line-height));
+    }
+
+    .text-\\[10px\\]\\/none {
+      font-size: 10px;
+      line-height: 1;
     }
 
     .text-\\[12px\\]\\/6 {
       font-size: 12px;
-      line-height: var(--line-height-6, 1.5rem);
+      line-height: calc(var(--spacing) * 6);
     }
 
     .text-\\[50\\%\\]\\/6 {
       font-size: 50%;
-      line-height: var(--line-height-6, 1.5rem);
+      line-height: calc(var(--spacing) * 6);
     }
 
     .text-\\[clamp\\(1rem\\,var\\(--size\\)\\,3rem\\)\\]\\/9 {
       font-size: clamp(1rem, var(--size), 3rem);
-      line-height: var(--line-height-9, 2.25rem);
+      line-height: calc(var(--spacing) * 9);
     }
 
     .text-\\[larger\\]\\/6 {
       font-size: larger;
-      line-height: var(--line-height-6, 1.5rem);
+      line-height: calc(var(--spacing) * 6);
     }
 
     .text-\\[xx-large\\]\\/6 {
       font-size: xx-large;
-      line-height: var(--line-height-6, 1.5rem);
+      line-height: calc(var(--spacing) * 6);
     }
 
     .text-sm\\/6 {
-      font-size: var(--font-size-sm, .875rem);
-      line-height: var(--line-height-6, 1.5rem);
+      font-size: var(--text-sm);
+      line-height: calc(var(--spacing) * 6);
     }
 
     .text-sm\\/\\[4px\\] {
-      font-size: var(--font-size-sm, .875rem);
+      font-size: var(--text-sm);
       line-height: 4px;
+    }
+
+    .text-sm\\/none {
+      font-size: var(--text-sm);
+      line-height: 1;
+    }
+
+    .text-sm\\/snug {
+      font-size: var(--text-sm);
+      line-height: var(--leading-snug);
     }
 
     .text-\\[12px\\] {
@@ -13616,7 +15056,7 @@ test('text', () => {
       font-size: 50%;
     }
 
-    .text-\\[absolute-size\\:--my-size\\] {
+    .text-\\[absolute-size\\:var\\(--my-size\\)\\] {
       font-size: var(--my-size);
     }
 
@@ -13632,7 +15072,7 @@ test('text', () => {
       font-size: larger;
     }
 
-    .text-\\[length\\:--my-size\\], .text-\\[percentage\\:--my-size\\], .text-\\[relative-size\\:--my-size\\] {
+    .text-\\[length\\:var\\(--my-size\\)\\], .text-\\[percentage\\:var\\(--my-size\\)\\], .text-\\[relative-size\\:var\\(--my-size\\)\\] {
       font-size: var(--my-size);
     }
 
@@ -13645,23 +15085,23 @@ test('text', () => {
     }
 
     .text-\\[\\#0088cc\\]\\/50, .text-\\[\\#0088cc\\]\\/\\[0\\.5\\], .text-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      color: #0088cc80;
+      color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .text-\\[--my-color\\] {
+    .text-\\[color\\:var\\(--my-color\\)\\] {
       color: var(--my-color);
     }
 
-    .text-\\[--my-color\\]\\/50, .text-\\[--my-color\\]\\/\\[0\\.5\\], .text-\\[--my-color\\]\\/\\[50\\%\\] {
-      color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .text-\\[color\\:var\\(--my-color\\)\\]\\/50, .text-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .text-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
-    .text-\\[color\\:--my-color\\] {
+    .text-\\[var\\(--my-color\\)\\] {
       color: var(--my-color);
     }
 
-    .text-\\[color\\:--my-color\\]\\/50, .text-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .text-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .text-\\[var\\(--my-color\\)\\]\\/50, .text-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .text-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
     .text-current {
@@ -13669,7 +15109,7 @@ test('text', () => {
     }
 
     .text-current\\/50, .text-current\\/\\[0\\.5\\], .text-current\\/\\[50\\%\\] {
-      color: color-mix(in srgb, currentColor 50%, transparent);
+      color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .text-inherit {
@@ -13677,11 +15117,23 @@ test('text', () => {
     }
 
     .text-red-500 {
-      color: var(--color-red-500, #ef4444);
+      color: var(--color-red-500);
+    }
+
+    .text-red-500\\/2\\.5 {
+      color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .text-red-500\\/2\\.25 {
+      color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .text-red-500\\/2\\.75 {
+      color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .text-red-500\\/50, .text-red-500\\/\\[0\\.5\\], .text-red-500\\/\\[50\\%\\] {
-      color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .text-transparent {
@@ -13689,56 +15141,69 @@ test('text', () => {
     }"
   `)
   expect(
-    run([
-      'text',
-      // color
-      '-text-red-500',
-      '-text-red-500/50',
-      '-text-red-500/[0.5]',
-      '-text-red-500/[50%]',
-      '-text-current',
-      '-text-current/50',
-      '-text-current/[0.5]',
-      '-text-current/[50%]',
-      '-text-inherit',
-      '-text-transparent',
-      '-text-[#0088cc]',
-      '-text-[#0088cc]/50',
-      '-text-[#0088cc]/[0.5]',
-      '-text-[#0088cc]/[50%]',
+    await compileCss(
+      css`
+        @theme inline reference {
+          --text-sm: 0.875rem;
+        }
+        @tailwind utilities;
+      `,
+      [
+        'text',
+        // color
+        '-text-red-500',
+        '-text-red-500/50',
+        '-text-red-500/[0.5]',
+        '-text-red-500/[50%]',
+        '-text-current',
+        '-text-current/50',
+        '-text-current/[0.5]',
+        '-text-current/[50%]',
+        '-text-inherit',
+        '-text-transparent',
+        '-text-[#0088cc]',
+        '-text-[#0088cc]/50',
+        '-text-[#0088cc]/[0.5]',
+        '-text-[#0088cc]/[50%]',
 
-      // font-size / line-height / letter-spacing / font-weight
-      '-text-sm',
-      '-text-sm/6',
-      '-text-sm/[4px]',
-    ]),
+        // font-size / line-height / letter-spacing / font-weight
+        '-text-sm',
+        '-text-sm/6',
+        'text-sm/foo',
+        '-text-sm/[4px]',
+        'text-[10px]/foo',
+      ],
+    ),
   ).toEqual('')
 })
 
-test('shadow', () => {
+test('shadow', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
-          --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+          --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
           --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
         }
         @tailwind utilities;
       `,
       [
         // Shadows
-        'shadow',
+        'shadow-sm',
         'shadow-xl',
         'shadow-none',
         'shadow-[12px_12px_#0088cc]',
         'shadow-[10px_10px]',
-        'shadow-[--value]',
-        'shadow-[shadow:--value]',
+        'shadow-[var(--value)]',
+        'shadow-[shadow:var(--value)]',
 
         // Colors
         'shadow-red-500',
         'shadow-red-500/50',
+        'shadow-red-500/2.25',
+        'shadow-red-500/2.5',
+        'shadow-red-500/2.75',
         'shadow-red-500/[0.5]',
         'shadow-red-500/[50%]',
         'shadow-current',
@@ -13751,128 +15216,99 @@ test('shadow', () => {
         'shadow-[#0088cc]/50',
         'shadow-[#0088cc]/[0.5]',
         'shadow-[#0088cc]/[50%]',
-        'shadow-[color:--value]',
-        'shadow-[color:--value]/50',
-        'shadow-[color:--value]/[0.5]',
-        'shadow-[color:--value]/[50%]',
+        'shadow-[color:var(--value)]',
+        'shadow-[color:var(--value)]/50',
+        'shadow-[color:var(--value)]/[0.5]',
+        'shadow-[color:var(--value)]/[50%]',
       ],
     ),
   ).toMatchInlineSnapshot(`
     ":root {
       --color-red-500: #ef4444;
-      --shadow: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;
+      --shadow-sm: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;
       --shadow-xl: 0 20px 25px -5px #0000001a, 0 8px 10px -6px #0000001a;
     }
 
-    .shadow {
-      --tw-shadow: 0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;
-      --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
-      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    }
-
-    .shadow-\\[--value\\] {
-      --tw-shadow: var(--value);
-      --tw-shadow-colored: var(--value);
-      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    }
-
     .shadow-\\[10px_10px\\] {
-      --tw-shadow: 10px 10px;
-      --tw-shadow-colored: 10px 10px var(--tw-shadow-color);
+      --tw-shadow: 10px 10px var(--tw-shadow-color, currentcolor);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .shadow-\\[12px_12px_\\#0088cc\\] {
-      --tw-shadow: 12px 12px #08c;
-      --tw-shadow-colored: 12px 12px var(--tw-shadow-color);
+      --tw-shadow: 12px 12px var(--tw-shadow-color, #08c);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
-    .shadow-\\[shadow\\:--value\\] {
+    .shadow-\\[shadow\\:var\\(--value\\)\\], .shadow-\\[var\\(--value\\)\\] {
       --tw-shadow: var(--value);
-      --tw-shadow-colored: var(--value);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .shadow-none {
       --tw-shadow: 0 0 #0000;
-      --tw-shadow-colored: 0 0 #0000;
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+
+    .shadow-sm {
+      --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, #0000001a), 0 1px 2px -1px var(--tw-shadow-color, #0000001a);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .shadow-xl {
-      --tw-shadow: 0 20px 25px -5px #0000001a, 0 8px 10px -6px #0000001a;
-      --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
+      --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color, #0000001a), 0 8px 10px -6px var(--tw-shadow-color, #0000001a);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .shadow-\\[\\#0088cc\\] {
       --tw-shadow-color: #08c;
-      --tw-shadow: var(--tw-shadow-colored);
     }
 
     .shadow-\\[\\#0088cc\\]\\/50, .shadow-\\[\\#0088cc\\]\\/\\[0\\.5\\], .shadow-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-shadow-color: #0088cc80;
-      --tw-shadow: var(--tw-shadow-colored);
+      --tw-shadow-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .shadow-\\[color\\:--value\\] {
+    .shadow-\\[color\\:var\\(--value\\)\\] {
       --tw-shadow-color: var(--value);
-      --tw-shadow: var(--tw-shadow-colored);
     }
 
-    .shadow-\\[color\\:--value\\]\\/50, .shadow-\\[color\\:--value\\]\\/\\[0\\.5\\], .shadow-\\[color\\:--value\\]\\/\\[50\\%\\] {
-      --tw-shadow-color: color-mix(in srgb, var(--value) 50%, transparent);
-      --tw-shadow: var(--tw-shadow-colored);
+    .shadow-\\[color\\:var\\(--value\\)\\]\\/50, .shadow-\\[color\\:var\\(--value\\)\\]\\/\\[0\\.5\\], .shadow-\\[color\\:var\\(--value\\)\\]\\/\\[50\\%\\] {
+      --tw-shadow-color: color-mix(in oklab, var(--value) 50%, transparent);
     }
 
     .shadow-current {
       --tw-shadow-color: currentColor;
-      --tw-shadow: var(--tw-shadow-colored);
     }
 
     .shadow-current\\/50, .shadow-current\\/\\[0\\.5\\], .shadow-current\\/\\[50\\%\\] {
-      --tw-shadow-color: color-mix(in srgb, currentColor 50%, transparent);
-      --tw-shadow: var(--tw-shadow-colored);
+      --tw-shadow-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .shadow-inherit {
       --tw-shadow-color: inherit;
-      --tw-shadow: var(--tw-shadow-colored);
     }
 
     .shadow-red-500 {
-      --tw-shadow-color: var(--color-red-500, #ef4444);
-      --tw-shadow: var(--tw-shadow-colored);
+      --tw-shadow-color: var(--color-red-500);
+    }
+
+    .shadow-red-500\\/2\\.5 {
+      --tw-shadow-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .shadow-red-500\\/2\\.25 {
+      --tw-shadow-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .shadow-red-500\\/2\\.75 {
+      --tw-shadow-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .shadow-red-500\\/50, .shadow-red-500\\/\\[0\\.5\\], .shadow-red-500\\/\\[50\\%\\] {
-      --tw-shadow-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
-      --tw-shadow: var(--tw-shadow-colored);
+      --tw-shadow-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .shadow-transparent {
       --tw-shadow-color: transparent;
-      --tw-shadow: var(--tw-shadow-colored);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-shadow: 0 0 #0000;
-          --tw-shadow-colored: 0 0 #0000;
-          --tw-inset-shadow: 0 0 #0000;
-          --tw-inset-shadow-colored: 0 0 #0000;
-          --tw-ring-color: initial;
-          --tw-ring-shadow: 0 0 #0000;
-          --tw-inset-ring-color: initial;
-          --tw-inset-ring-shadow: 0 0 #0000;
-          --tw-ring-inset: initial;
-          --tw-ring-offset-width: 0px;
-          --tw-ring-offset-color: #fff;
-          --tw-ring-offset-shadow: 0 0 #0000;
-        }
-      }
     }
 
     @property --tw-shadow {
@@ -13881,10 +15317,9 @@ test('shadow', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-shadow-colored {
+    @property --tw-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-inset-shadow {
@@ -13893,10 +15328,9 @@ test('shadow', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-inset-shadow-colored {
+    @property --tw-inset-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-ring-color {
@@ -13945,7 +15379,7 @@ test('shadow', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-shadow-xl',
       '-shadow-none',
       '-shadow-red-500',
@@ -13962,14 +15396,14 @@ test('shadow', () => {
       '-shadow-[#0088cc]/50',
       '-shadow-[#0088cc]/[0.5]',
       '-shadow-[#0088cc]/[50%]',
-      '-shadow-[--value]',
+      '-shadow-[var(--value)]',
     ]),
   ).toEqual('')
 })
 
-test('inset-shadow', () => {
+test('inset-shadow', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -13985,12 +15419,15 @@ test('inset-shadow', () => {
         'inset-shadow-none',
         'inset-shadow-[12px_12px_#0088cc]',
         'inset-shadow-[10px_10px]',
-        'inset-shadow-[--value]',
-        'inset-shadow-[shadow:--value]',
+        'inset-shadow-[var(--value)]',
+        'inset-shadow-[shadow:var(--value)]',
 
         // Colors
         'inset-shadow-red-500',
         'inset-shadow-red-500/50',
+        'inset-shadow-red-500/2.25',
+        'inset-shadow-red-500/2.5',
+        'inset-shadow-red-500/2.75',
         'inset-shadow-red-500/[0.5]',
         'inset-shadow-red-500/[50%]',
         'inset-shadow-current',
@@ -14003,10 +15440,10 @@ test('inset-shadow', () => {
         'inset-shadow-[#0088cc]/50',
         'inset-shadow-[#0088cc]/[0.5]',
         'inset-shadow-[#0088cc]/[50%]',
-        'inset-shadow-[color:--value]',
-        'inset-shadow-[color:--value]/50',
-        'inset-shadow-[color:--value]/[0.5]',
-        'inset-shadow-[color:--value]/[50%]',
+        'inset-shadow-[color:var(--value)]',
+        'inset-shadow-[color:var(--value)]/50',
+        'inset-shadow-[color:var(--value)]/[0.5]',
+        'inset-shadow-[color:var(--value)]/[50%]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -14017,114 +15454,85 @@ test('inset-shadow', () => {
     }
 
     .inset-shadow {
-      --tw-inset-shadow: inset 0 2px 4px #0000000d;
-      --tw-inset-shadow-colored: inset 0 2px 4px var(--tw-inset-shadow-color);
-      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    }
-
-    .inset-shadow-\\[--value\\] {
-      --tw-inset-shadow: inset var(--value);
-      --tw-inset-shadow-colored: inset var(--value);
+      --tw-inset-shadow: inset 0 2px 4px var(--tw-inset-shadow-color, #0000000d);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .inset-shadow-\\[10px_10px\\] {
-      --tw-inset-shadow: inset 10px 10px;
-      --tw-inset-shadow-colored: inset 10px 10px var(--tw-inset-shadow-color);
+      --tw-inset-shadow: inset 10px 10px var(--tw-inset-shadow-color, currentcolor);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .inset-shadow-\\[12px_12px_\\#0088cc\\] {
-      --tw-inset-shadow: inset 12px 12px #08c;
-      --tw-inset-shadow-colored: inset 12px 12px var(--tw-inset-shadow-color);
+      --tw-inset-shadow: inset 12px 12px var(--tw-inset-shadow-color, #08c);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
-    .inset-shadow-\\[shadow\\:--value\\] {
+    .inset-shadow-\\[shadow\\:var\\(--value\\)\\], .inset-shadow-\\[var\\(--value\\)\\] {
       --tw-inset-shadow: inset var(--value);
-      --tw-inset-shadow-colored: inset var(--value);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .inset-shadow-none {
       --tw-inset-shadow: 0 0 #0000;
-      --tw-inset-shadow-colored: 0 0 #0000;
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .inset-shadow-sm {
-      --tw-inset-shadow: inset 0 1px 1px #0000000d;
-      --tw-inset-shadow-colored: inset 0 1px 1px var(--tw-inset-shadow-color);
+      --tw-inset-shadow: inset 0 1px 1px var(--tw-inset-shadow-color, #0000000d);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .inset-shadow-\\[\\#0088cc\\] {
       --tw-inset-shadow-color: #08c;
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
     }
 
     .inset-shadow-\\[\\#0088cc\\]\\/50, .inset-shadow-\\[\\#0088cc\\]\\/\\[0\\.5\\], .inset-shadow-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-inset-shadow-color: #0088cc80;
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
+      --tw-inset-shadow-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .inset-shadow-\\[color\\:--value\\] {
+    .inset-shadow-\\[color\\:var\\(--value\\)\\] {
       --tw-inset-shadow-color: var(--value);
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
     }
 
-    .inset-shadow-\\[color\\:--value\\]\\/50, .inset-shadow-\\[color\\:--value\\]\\/\\[0\\.5\\], .inset-shadow-\\[color\\:--value\\]\\/\\[50\\%\\] {
-      --tw-inset-shadow-color: color-mix(in srgb, var(--value) 50%, transparent);
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
+    .inset-shadow-\\[color\\:var\\(--value\\)\\]\\/50, .inset-shadow-\\[color\\:var\\(--value\\)\\]\\/\\[0\\.5\\], .inset-shadow-\\[color\\:var\\(--value\\)\\]\\/\\[50\\%\\] {
+      --tw-inset-shadow-color: color-mix(in oklab, var(--value) 50%, transparent);
     }
 
     .inset-shadow-current {
       --tw-inset-shadow-color: currentColor;
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
     }
 
     .inset-shadow-current\\/50, .inset-shadow-current\\/\\[0\\.5\\], .inset-shadow-current\\/\\[50\\%\\] {
-      --tw-inset-shadow-color: color-mix(in srgb, currentColor 50%, transparent);
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
+      --tw-inset-shadow-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .inset-shadow-inherit {
       --tw-inset-shadow-color: inherit;
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
     }
 
     .inset-shadow-red-500 {
-      --tw-inset-shadow-color: var(--color-red-500, #ef4444);
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
+      --tw-inset-shadow-color: var(--color-red-500);
+    }
+
+    .inset-shadow-red-500\\/2\\.5 {
+      --tw-inset-shadow-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .inset-shadow-red-500\\/2\\.25 {
+      --tw-inset-shadow-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .inset-shadow-red-500\\/2\\.75 {
+      --tw-inset-shadow-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .inset-shadow-red-500\\/50, .inset-shadow-red-500\\/\\[0\\.5\\], .inset-shadow-red-500\\/\\[50\\%\\] {
-      --tw-inset-shadow-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
+      --tw-inset-shadow-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .inset-shadow-transparent {
       --tw-inset-shadow-color: transparent;
-      --tw-inset-shadow: var(--tw-inset-shadow-colored);
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-shadow: 0 0 #0000;
-          --tw-shadow-colored: 0 0 #0000;
-          --tw-inset-shadow: 0 0 #0000;
-          --tw-inset-shadow-colored: 0 0 #0000;
-          --tw-ring-color: initial;
-          --tw-ring-shadow: 0 0 #0000;
-          --tw-inset-ring-color: initial;
-          --tw-inset-ring-shadow: 0 0 #0000;
-          --tw-ring-inset: initial;
-          --tw-ring-offset-width: 0px;
-          --tw-ring-offset-color: #fff;
-          --tw-ring-offset-shadow: 0 0 #0000;
-        }
-      }
     }
 
     @property --tw-shadow {
@@ -14133,10 +15541,9 @@ test('inset-shadow', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-shadow-colored {
+    @property --tw-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-inset-shadow {
@@ -14145,10 +15552,9 @@ test('inset-shadow', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-inset-shadow-colored {
+    @property --tw-inset-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-ring-color {
@@ -14197,7 +15603,7 @@ test('inset-shadow', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-inset-shadow-sm',
       '-inset-shadow-none',
       '-inset-shadow-red-500',
@@ -14214,14 +15620,14 @@ test('inset-shadow', () => {
       '-inset-shadow-[#0088cc]/50',
       '-inset-shadow-[#0088cc]/[0.5]',
       '-inset-shadow-[#0088cc]/[50%]',
-      '-inset-shadow-[--value]',
+      '-inset-shadow-[var(--value)]',
     ]),
   ).toEqual('')
 })
 
-test('ring', () => {
+test('ring', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -14233,6 +15639,9 @@ test('ring', () => {
         'ring-inset',
         'ring-red-500',
         'ring-red-500/50',
+        'ring-red-500/2.25',
+        'ring-red-500/2.5',
+        'ring-red-500/2.75',
         'ring-red-500/[0.5]',
         'ring-red-500/[50%]',
         'ring-current',
@@ -14245,14 +15654,14 @@ test('ring', () => {
         'ring-[#0088cc]/50',
         'ring-[#0088cc]/[0.5]',
         'ring-[#0088cc]/[50%]',
-        'ring-[--my-color]',
-        'ring-[--my-color]/50',
-        'ring-[--my-color]/[0.5]',
-        'ring-[--my-color]/[50%]',
-        'ring-[color:--my-color]',
-        'ring-[color:--my-color]/50',
-        'ring-[color:--my-color]/[0.5]',
-        'ring-[color:--my-color]/[50%]',
+        'ring-[var(--my-color)]',
+        'ring-[var(--my-color)]/50',
+        'ring-[var(--my-color)]/[0.5]',
+        'ring-[var(--my-color)]/[50%]',
+        'ring-[color:var(--my-color)]',
+        'ring-[color:var(--my-color)]/50',
+        'ring-[color:var(--my-color)]/[0.5]',
+        'ring-[color:var(--my-color)]/[50%]',
 
         // ring width
         'ring',
@@ -14261,7 +15670,7 @@ test('ring', () => {
         'ring-2',
         'ring-4',
         'ring-[12px]',
-        'ring-[length:--my-width]',
+        'ring-[length:var(--my-width)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -14299,7 +15708,7 @@ test('ring', () => {
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
-    .ring-\\[length\\:--my-width\\] {
+    .ring-\\[length\\:var\\(--my-width\\)\\] {
       --tw-ring-shadow: var(--tw-ring-inset, ) 0 0 0 calc(var(--my-width)  + var(--tw-ring-offset-width)) var(--tw-ring-color, currentColor);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
@@ -14309,23 +15718,23 @@ test('ring', () => {
     }
 
     .ring-\\[\\#0088cc\\]\\/50, .ring-\\[\\#0088cc\\]\\/\\[0\\.5\\], .ring-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-ring-color: #0088cc80;
+      --tw-ring-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .ring-\\[--my-color\\] {
+    .ring-\\[color\\:var\\(--my-color\\)\\] {
       --tw-ring-color: var(--my-color);
     }
 
-    .ring-\\[--my-color\\]\\/50, .ring-\\[--my-color\\]\\/\\[0\\.5\\], .ring-\\[--my-color\\]\\/\\[50\\%\\] {
-      --tw-ring-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .ring-\\[color\\:var\\(--my-color\\)\\]\\/50, .ring-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .ring-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-ring-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
-    .ring-\\[color\\:--my-color\\] {
+    .ring-\\[var\\(--my-color\\)\\] {
       --tw-ring-color: var(--my-color);
     }
 
-    .ring-\\[color\\:--my-color\\]\\/50, .ring-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .ring-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      --tw-ring-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .ring-\\[var\\(--my-color\\)\\]\\/50, .ring-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .ring-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-ring-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
     .ring-current {
@@ -14333,7 +15742,7 @@ test('ring', () => {
     }
 
     .ring-current\\/50, .ring-current\\/\\[0\\.5\\], .ring-current\\/\\[50\\%\\] {
-      --tw-ring-color: color-mix(in srgb, currentColor 50%, transparent);
+      --tw-ring-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .ring-inherit {
@@ -14341,11 +15750,23 @@ test('ring', () => {
     }
 
     .ring-red-500 {
-      --tw-ring-color: var(--color-red-500, #ef4444);
+      --tw-ring-color: var(--color-red-500);
+    }
+
+    .ring-red-500\\/2\\.5 {
+      --tw-ring-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .ring-red-500\\/2\\.25 {
+      --tw-ring-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .ring-red-500\\/2\\.75 {
+      --tw-ring-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .ring-red-500\\/50, .ring-red-500\\/\\[0\\.5\\], .ring-red-500\\/\\[50\\%\\] {
-      --tw-ring-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      --tw-ring-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .ring-transparent {
@@ -14356,35 +15777,15 @@ test('ring', () => {
       --tw-ring-inset: inset;
     }
 
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-shadow: 0 0 #0000;
-          --tw-shadow-colored: 0 0 #0000;
-          --tw-inset-shadow: 0 0 #0000;
-          --tw-inset-shadow-colored: 0 0 #0000;
-          --tw-ring-color: initial;
-          --tw-ring-shadow: 0 0 #0000;
-          --tw-inset-ring-color: initial;
-          --tw-inset-ring-shadow: 0 0 #0000;
-          --tw-ring-inset: initial;
-          --tw-ring-offset-width: 0px;
-          --tw-ring-offset-color: #fff;
-          --tw-ring-offset-shadow: 0 0 #0000;
-        }
-      }
-    }
-
     @property --tw-shadow {
       syntax: "*";
       inherits: false;
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-shadow-colored {
+    @property --tw-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-inset-shadow {
@@ -14393,10 +15794,9 @@ test('ring', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-inset-shadow-colored {
+    @property --tw-inset-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-ring-color {
@@ -14445,7 +15845,7 @@ test('ring', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       // ring color
       '-ring-inset',
       '-ring-red-500',
@@ -14465,6 +15865,7 @@ test('ring', () => {
 
       // ring width
       '-ring',
+      'ring--1',
       '-ring-0',
       '-ring-1',
       '-ring-2',
@@ -14476,14 +15877,14 @@ test('ring', () => {
       'ring-2/foo',
       'ring-4/foo',
       'ring-[12px]/foo',
-      'ring-[length:--my-width]/foo',
+      'ring-[length:var(--my-width)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('inset-ring', () => {
+test('inset-ring', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -14494,6 +15895,9 @@ test('inset-ring', () => {
         // ring color
         'inset-ring-red-500',
         'inset-ring-red-500/50',
+        'inset-ring-red-500/2.25',
+        'inset-ring-red-500/2.5',
+        'inset-ring-red-500/2.75',
         'inset-ring-red-500/[0.5]',
         'inset-ring-red-500/[50%]',
         'inset-ring-current',
@@ -14506,14 +15910,14 @@ test('inset-ring', () => {
         'inset-ring-[#0088cc]/50',
         'inset-ring-[#0088cc]/[0.5]',
         'inset-ring-[#0088cc]/[50%]',
-        'inset-ring-[--my-color]',
-        'inset-ring-[--my-color]/50',
-        'inset-ring-[--my-color]/[0.5]',
-        'inset-ring-[--my-color]/[50%]',
-        'inset-ring-[color:--my-color]',
-        'inset-ring-[color:--my-color]/50',
-        'inset-ring-[color:--my-color]/[0.5]',
-        'inset-ring-[color:--my-color]/[50%]',
+        'inset-ring-[var(--my-color)]',
+        'inset-ring-[var(--my-color)]/50',
+        'inset-ring-[var(--my-color)]/[0.5]',
+        'inset-ring-[var(--my-color)]/[50%]',
+        'inset-ring-[color:var(--my-color)]',
+        'inset-ring-[color:var(--my-color)]/50',
+        'inset-ring-[color:var(--my-color)]/[0.5]',
+        'inset-ring-[color:var(--my-color)]/[50%]',
 
         // ring width
         'inset-ring',
@@ -14522,7 +15926,7 @@ test('inset-ring', () => {
         'inset-ring-2',
         'inset-ring-4',
         'inset-ring-[12px]',
-        'inset-ring-[length:--my-width]',
+        'inset-ring-[length:var(--my-width)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -14560,7 +15964,7 @@ test('inset-ring', () => {
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
-    .inset-ring-\\[length\\:--my-width\\] {
+    .inset-ring-\\[length\\:var\\(--my-width\\)\\] {
       --tw-inset-ring-shadow: inset 0 0 0 var(--my-width) var(--tw-inset-ring-color, currentColor);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
@@ -14570,23 +15974,23 @@ test('inset-ring', () => {
     }
 
     .inset-ring-\\[\\#0088cc\\]\\/50, .inset-ring-\\[\\#0088cc\\]\\/\\[0\\.5\\], .inset-ring-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-inset-ring-color: #0088cc80;
+      --tw-inset-ring-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .inset-ring-\\[--my-color\\] {
+    .inset-ring-\\[color\\:var\\(--my-color\\)\\] {
       --tw-inset-ring-color: var(--my-color);
     }
 
-    .inset-ring-\\[--my-color\\]\\/50, .inset-ring-\\[--my-color\\]\\/\\[0\\.5\\], .inset-ring-\\[--my-color\\]\\/\\[50\\%\\] {
-      --tw-inset-ring-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .inset-ring-\\[color\\:var\\(--my-color\\)\\]\\/50, .inset-ring-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .inset-ring-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-inset-ring-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
-    .inset-ring-\\[color\\:--my-color\\] {
+    .inset-ring-\\[var\\(--my-color\\)\\] {
       --tw-inset-ring-color: var(--my-color);
     }
 
-    .inset-ring-\\[color\\:--my-color\\]\\/50, .inset-ring-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .inset-ring-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      --tw-inset-ring-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .inset-ring-\\[var\\(--my-color\\)\\]\\/50, .inset-ring-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .inset-ring-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-inset-ring-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
     .inset-ring-current {
@@ -14594,7 +15998,7 @@ test('inset-ring', () => {
     }
 
     .inset-ring-current\\/50, .inset-ring-current\\/\\[0\\.5\\], .inset-ring-current\\/\\[50\\%\\] {
-      --tw-inset-ring-color: color-mix(in srgb, currentColor 50%, transparent);
+      --tw-inset-ring-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .inset-ring-inherit {
@@ -14602,34 +16006,27 @@ test('inset-ring', () => {
     }
 
     .inset-ring-red-500 {
-      --tw-inset-ring-color: var(--color-red-500, #ef4444);
+      --tw-inset-ring-color: var(--color-red-500);
+    }
+
+    .inset-ring-red-500\\/2\\.5 {
+      --tw-inset-ring-color: color-mix(in oklab, var(--color-red-500) 2.5%, transparent);
+    }
+
+    .inset-ring-red-500\\/2\\.25 {
+      --tw-inset-ring-color: color-mix(in oklab, var(--color-red-500) 2.25%, transparent);
+    }
+
+    .inset-ring-red-500\\/2\\.75 {
+      --tw-inset-ring-color: color-mix(in oklab, var(--color-red-500) 2.75%, transparent);
     }
 
     .inset-ring-red-500\\/50, .inset-ring-red-500\\/\\[0\\.5\\], .inset-ring-red-500\\/\\[50\\%\\] {
-      --tw-inset-ring-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      --tw-inset-ring-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .inset-ring-transparent {
       --tw-inset-ring-color: transparent;
-    }
-
-    @supports (-moz-orient: inline) {
-      @layer base {
-        *, :before, :after, ::backdrop {
-          --tw-shadow: 0 0 #0000;
-          --tw-shadow-colored: 0 0 #0000;
-          --tw-inset-shadow: 0 0 #0000;
-          --tw-inset-shadow-colored: 0 0 #0000;
-          --tw-ring-color: initial;
-          --tw-ring-shadow: 0 0 #0000;
-          --tw-inset-ring-color: initial;
-          --tw-inset-ring-shadow: 0 0 #0000;
-          --tw-ring-inset: initial;
-          --tw-ring-offset-width: 0px;
-          --tw-ring-offset-color: #fff;
-          --tw-ring-offset-shadow: 0 0 #0000;
-        }
-      }
     }
 
     @property --tw-shadow {
@@ -14638,10 +16035,9 @@ test('inset-ring', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-shadow-colored {
+    @property --tw-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-inset-shadow {
@@ -14650,10 +16046,9 @@ test('inset-ring', () => {
       initial-value: 0 0 #0000;
     }
 
-    @property --tw-inset-shadow-colored {
+    @property --tw-inset-shadow-color {
       syntax: "*";
-      inherits: false;
-      initial-value: 0 0 #0000;
+      inherits: false
     }
 
     @property --tw-ring-color {
@@ -14702,7 +16097,7 @@ test('inset-ring', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       // ring color
       '-inset-ring-red-500',
       '-inset-ring-red-500/50',
@@ -14721,6 +16116,7 @@ test('inset-ring', () => {
 
       // ring width
       '-inset-ring',
+      'inset-ring--1',
       '-inset-ring-0',
       '-inset-ring-1',
       '-inset-ring-2',
@@ -14732,14 +16128,14 @@ test('inset-ring', () => {
       'inset-ring-2/foo',
       'inset-ring-4/foo',
       'inset-ring-[12px]/foo',
-      'inset-ring-[length:--my-width]/foo',
+      'inset-ring-[length:var(--my-width)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('ring-offset', () => {
+test('ring-offset', async () => {
   expect(
-    compileCss(
+    await compileCss(
       css`
         @theme {
           --color-red-500: #ef4444;
@@ -14764,14 +16160,14 @@ test('ring-offset', () => {
         'ring-offset-[#0088cc]/[0.5]',
         'ring-offset-[#0088cc]/[50%]',
 
-        'ring-offset-[--my-color]',
-        'ring-offset-[--my-color]/50',
-        'ring-offset-[--my-color]/[0.5]',
-        'ring-offset-[--my-color]/[50%]',
-        'ring-offset-[color:--my-color]',
-        'ring-offset-[color:--my-color]/50',
-        'ring-offset-[color:--my-color]/[0.5]',
-        'ring-offset-[color:--my-color]/[50%]',
+        'ring-offset-[var(--my-color)]',
+        'ring-offset-[var(--my-color)]/50',
+        'ring-offset-[var(--my-color)]/[0.5]',
+        'ring-offset-[var(--my-color)]/[50%]',
+        'ring-offset-[color:var(--my-color)]',
+        'ring-offset-[color:var(--my-color)]/50',
+        'ring-offset-[color:var(--my-color)]/[0.5]',
+        'ring-offset-[color:var(--my-color)]/[50%]',
 
         // ring width
         'ring-offset-0',
@@ -14779,7 +16175,7 @@ test('ring-offset', () => {
         'ring-offset-2',
         'ring-offset-4',
         'ring-offset-[12px]',
-        'ring-offset-[length:--my-width]',
+        'ring-offset-[length:var(--my-width)]',
       ],
     ),
   ).toMatchInlineSnapshot(`
@@ -14812,7 +16208,7 @@ test('ring-offset', () => {
       --tw-ring-offset-shadow: var(--tw-ring-inset, ) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
     }
 
-    .ring-offset-\\[length\\:--my-width\\] {
+    .ring-offset-\\[length\\:var\\(--my-width\\)\\] {
       --tw-ring-offset-width: var(--my-width);
       --tw-ring-offset-shadow: var(--tw-ring-inset, ) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
     }
@@ -14822,23 +16218,23 @@ test('ring-offset', () => {
     }
 
     .ring-offset-\\[\\#0088cc\\]\\/50, .ring-offset-\\[\\#0088cc\\]\\/\\[0\\.5\\], .ring-offset-\\[\\#0088cc\\]\\/\\[50\\%\\] {
-      --tw-ring-offset-color: #0088cc80;
+      --tw-ring-offset-color: oklab(59.9824% -.06725 -.12414 / .5);
     }
 
-    .ring-offset-\\[--my-color\\] {
+    .ring-offset-\\[color\\:var\\(--my-color\\)\\] {
       --tw-ring-offset-color: var(--my-color);
     }
 
-    .ring-offset-\\[--my-color\\]\\/50, .ring-offset-\\[--my-color\\]\\/\\[0\\.5\\], .ring-offset-\\[--my-color\\]\\/\\[50\\%\\] {
-      --tw-ring-offset-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .ring-offset-\\[color\\:var\\(--my-color\\)\\]\\/50, .ring-offset-\\[color\\:var\\(--my-color\\)\\]\\/\\[0\\.5\\], .ring-offset-\\[color\\:var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-ring-offset-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
-    .ring-offset-\\[color\\:--my-color\\] {
+    .ring-offset-\\[var\\(--my-color\\)\\] {
       --tw-ring-offset-color: var(--my-color);
     }
 
-    .ring-offset-\\[color\\:--my-color\\]\\/50, .ring-offset-\\[color\\:--my-color\\]\\/\\[0\\.5\\], .ring-offset-\\[color\\:--my-color\\]\\/\\[50\\%\\] {
-      --tw-ring-offset-color: color-mix(in srgb, var(--my-color) 50%, transparent);
+    .ring-offset-\\[var\\(--my-color\\)\\]\\/50, .ring-offset-\\[var\\(--my-color\\)\\]\\/\\[0\\.5\\], .ring-offset-\\[var\\(--my-color\\)\\]\\/\\[50\\%\\] {
+      --tw-ring-offset-color: color-mix(in oklab, var(--my-color) 50%, transparent);
     }
 
     .ring-offset-current {
@@ -14846,7 +16242,7 @@ test('ring-offset', () => {
     }
 
     .ring-offset-current\\/50, .ring-offset-current\\/\\[0\\.5\\], .ring-offset-current\\/\\[50\\%\\] {
-      --tw-ring-offset-color: color-mix(in srgb, currentColor 50%, transparent);
+      --tw-ring-offset-color: color-mix(in oklab, currentColor 50%, transparent);
     }
 
     .ring-offset-inherit {
@@ -14854,11 +16250,11 @@ test('ring-offset', () => {
     }
 
     .ring-offset-red-500 {
-      --tw-ring-offset-color: var(--color-red-500, #ef4444);
+      --tw-ring-offset-color: var(--color-red-500);
     }
 
     .ring-offset-red-500\\/50, .ring-offset-red-500\\/\\[0\\.5\\], .ring-offset-red-500\\/\\[50\\%\\] {
-      --tw-ring-offset-color: color-mix(in srgb, var(--color-red-500, #ef4444) 50%, transparent);
+      --tw-ring-offset-color: color-mix(in oklab, var(--color-red-500) 50%, transparent);
     }
 
     .ring-offset-transparent {
@@ -14866,7 +16262,7 @@ test('ring-offset', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       'ring-offset',
       // ring color
       '-ring-offset-inset',
@@ -14886,6 +16282,7 @@ test('ring-offset', () => {
       '-ring-offset-[#0088cc]/[50%]',
 
       // ring width
+      'ring-offset--1',
       '-ring-offset-0',
       '-ring-offset-1',
       '-ring-offset-2',
@@ -14896,14 +16293,14 @@ test('ring-offset', () => {
       'ring-offset-2/foo',
       'ring-offset-4/foo',
       'ring-offset-[12px]/foo',
-      'ring-offset-[length:--my-width]/foo',
+      'ring-offset-[length:var(--my-width)]/foo',
     ]),
   ).toEqual('')
 })
 
-test('@container', () => {
+test('@container', async () => {
   expect(
-    run([
+    await run([
       '@container',
       '@container-normal',
       '@container/sidebar',
@@ -14937,7 +16334,7 @@ test('@container', () => {
     }"
   `)
   expect(
-    run([
+    await run([
       '-@container',
       '-@container-normal',
       '-@container/sidebar',
@@ -14948,9 +16345,127 @@ test('@container', () => {
   ).toEqual('')
 })
 
+describe('spacing utilities', () => {
+  test('`--spacing: initial` disables the spacing multiplier', async () => {
+    let { build } = await compile(css`
+      @theme {
+        --spacing: initial;
+        --spacing-4: 1rem;
+      }
+      @tailwind utilities;
+    `)
+    let compiled = build(['px-1', 'px-4'])
+
+    expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
+      ":root {
+        --spacing-4: 1rem;
+      }
+
+      .px-4 {
+        padding-inline: var(--spacing-4);
+      }"
+    `)
+  })
+
+  test('`--spacing-*: initial` disables the spacing multiplier', async () => {
+    let { build } = await compile(css`
+      @theme {
+        --spacing-*: initial;
+        --spacing-4: 1rem;
+      }
+      @tailwind utilities;
+    `)
+    let compiled = build(['px-1', 'px-4'])
+
+    expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
+      ":root {
+        --spacing-4: 1rem;
+      }
+
+      .px-4 {
+        padding-inline: var(--spacing-4);
+      }"
+    `)
+  })
+
+  test('only multiples of 0.25 with no trailing zeroes are supported with the spacing multiplier', async () => {
+    let { build } = await compile(css`
+      @theme {
+        --spacing: 4px;
+      }
+      @tailwind utilities;
+    `)
+    let compiled = build(['px-0.25', 'px-1.5', 'px-2.75', 'px-0.375', 'px-2.50', 'px-.75'])
+
+    expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
+      ":root {
+        --spacing: 4px;
+      }
+
+      .px-0\\.25 {
+        padding-inline: calc(var(--spacing) * .25);
+      }
+
+      .px-1\\.5 {
+        padding-inline: calc(var(--spacing) * 1.5);
+      }
+
+      .px-2\\.75 {
+        padding-inline: calc(var(--spacing) * 2.75);
+      }"
+    `)
+  })
+
+  test('spacing utilities must have a value', async () => {
+    let { build } = await compile(css`
+      @theme reference {
+        --spacing: 4px;
+      }
+      @tailwind utilities;
+    `)
+    let compiled = build(['px'])
+
+    expect(optimizeCss(compiled).trim()).toEqual('')
+  })
+
+  test('--spacing-* variables take precedence over --container-* variables', async () => {
+    let { build } = await compile(css`
+      @theme {
+        --spacing-sm: 8px;
+        --container-sm: 256px;
+      }
+      @tailwind utilities;
+    `)
+    let compiled = build(['w-sm', 'max-w-sm', 'min-w-sm', 'basis-sm'])
+
+    expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
+      ":root {
+        --spacing-sm: 8px;
+        --container-sm: 256px;
+      }
+
+      .w-sm {
+        width: var(--spacing-sm);
+      }
+
+      .max-w-sm {
+        max-width: var(--spacing-sm);
+      }
+
+      .min-w-sm {
+        min-width: var(--spacing-sm);
+      }
+
+      .basis-sm {
+        flex-basis: var(--spacing-sm);
+      }"
+    `)
+  })
+})
+
 describe('custom utilities', () => {
-  test('custom static utility', () => {
-    let compiled = compile(css`
+  test('custom static utility', async () => {
+    let { build } = await compile(css`
       @layer utilities {
         @tailwind utilities;
       }
@@ -14963,7 +16478,8 @@ describe('custom utilities', () => {
         text-box-trim: both;
         text-box-edge: cap alphabetic;
       }
-    `).build(['text-trim', 'lg:text-trim'])
+    `)
+    let compiled = build(['text-trim', 'lg:text-trim'])
 
     expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
       "@layer utilities {
@@ -14982,8 +16498,29 @@ describe('custom utilities', () => {
     `)
   })
 
-  test('The later version of a static utility is used', () => {
-    let compiled = compile(css`
+  test('custom static utility (negative)', async () => {
+    let { build } = await compile(css`
+      @layer utilities {
+        @tailwind utilities;
+      }
+
+      @utility -example {
+        value: -1;
+      }
+    `)
+    let compiled = build(['-example', 'lg:-example'])
+
+    expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
+      "@layer utilities {
+        .-example {
+          value: -1;
+        }
+      }"
+    `)
+  })
+
+  test('Multiple static utilities are merged', async () => {
+    let { build } = await compile(css`
       @layer utilities {
         @tailwind utilities;
       }
@@ -14996,19 +16533,21 @@ describe('custom utilities', () => {
       @utility really-round {
         border-radius: 30rem;
       }
-    `).build(['really-round'])
+    `)
+    let compiled = build(['really-round'])
 
     expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
       "@layer utilities {
         .really-round {
+          --custom-prop: hi;
           border-radius: 30rem;
         }
       }"
     `)
   })
 
-  test('custom utilities support some special chracters', () => {
-    let compiled = compile(css`
+  test('custom utilities support some special characters', async () => {
+    let { build } = await compile(css`
       @layer utilities {
         @tailwind utilities;
       }
@@ -15020,7 +16559,8 @@ describe('custom utilities', () => {
       @utility push-50% {
         right: 50%;
       }
-    `).build(['push-1/2', 'push-50%'])
+    `)
+    let compiled = build(['push-1/2', 'push-50%'])
 
     expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
       "@layer utilities {
@@ -15031,37 +16571,40 @@ describe('custom utilities', () => {
     `)
   })
 
-  test('can override specific versions of a functional utility with a static utility', () => {
-    let compiled = compile(css`
+  test('can override specific versions of a functional utility with a static utility', async () => {
+    let { build } = await compile(css`
       @layer utilities {
         @tailwind utilities;
       }
 
       @theme reference {
-        --font-size-sm: 0.875rem;
-        --font-size-sm--line-height: 1.25rem;
+        --text-sm: 0.875rem;
+        --text-sm--line-height: 1.25rem;
       }
 
       @utility text-sm {
-        font-size: var(--font-size-sm, 0.875rem);
-        line-height: var(--font-size-sm--line-height, 1.25rem);
+        font-size: var(--text-sm, 0.8755rem);
+        line-height: var(--text-sm--line-height, 1.255rem);
         text-rendering: optimizeLegibility;
       }
-    `).build(['text-sm'])
+    `)
+    let compiled = build(['text-sm'])
 
     expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
       "@layer utilities {
         .text-sm {
-          font-size: var(--font-size-sm, .875rem);
-          line-height: var(--font-size-sm--line-height, 1.25rem);
-          text-rendering: optimizelegibility;
+          font-size: var(--text-sm);
+          line-height: var(--tw-leading, var(--text-sm--line-height));
+          font-size: var(--text-sm, .8755rem);
+          line-height: var(--text-sm--line-height, 1.255rem);
+          text-rendering: optimizeLegibility;
         }
       }"
     `)
   })
 
-  test('can override the default value of a functional utility', () => {
-    let compiled = compile(css`
+  test('can override the default value of a functional utility', async () => {
+    let { build } = await compile(css`
       @layer utilities {
         @tailwind utilities;
       }
@@ -15073,7 +16616,8 @@ describe('custom utilities', () => {
       @utility rounded {
         border-radius: 50rem;
       }
-    `).build(['rounded', 'rounded-xl', 'rounded-[33px]'])
+    `)
+    let compiled = build(['rounded', 'rounded-xl', 'rounded-[33px]'])
 
     expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
       "@layer utilities {
@@ -15086,14 +16630,14 @@ describe('custom utilities', () => {
         }
 
         .rounded-xl {
-          border-radius: var(--radius-xl, 16px);
+          border-radius: var(--radius-xl);
         }
       }"
     `)
   })
 
-  test('custom utilities are sorted by used properties', () => {
-    let compiled = compile(css`
+  test('custom utilities are sorted by used properties', async () => {
+    let { build } = await compile(css`
       @layer utilities {
         @tailwind utilities;
       }
@@ -15101,7 +16645,8 @@ describe('custom utilities', () => {
       @utility push-left {
         right: 100%;
       }
-    `).build(['top-[100px]', 'push-left', 'right-[100px]', 'bottom-[100px]'])
+    `)
+    let compiled = build(['top-[100px]', 'push-left', 'right-[100px]', 'bottom-[100px]'])
 
     expect(optimizeCss(compiled).trim()).toMatchInlineSnapshot(`
       "@layer utilities {
@@ -15124,29 +16669,1124 @@ describe('custom utilities', () => {
     `)
   })
 
-  test('custom utilities must use a valid name definitions ', () => {
-    expect(() =>
+  test('custom utilities must use a valid name definitions', async () => {
+    await expect(() =>
       compile(css`
-        @utility push-* {
+        @utility push-| {
           right: 100%;
         }
       `),
-    ).toThrowError(/should be alphanumeric/)
+    ).rejects.toThrowError(/should be alphanumeric/)
 
-    expect(() =>
+    await expect(() =>
       compile(css`
         @utility ~push {
           right: 100%;
         }
       `),
-    ).toThrowError(/should be alphanumeric/)
+    ).rejects.toThrowError(/should be alphanumeric/)
 
-    expect(() =>
+    await expect(() =>
       compile(css`
         @utility @push {
           right: 100%;
         }
       `),
-    ).toThrowError(/should be alphanumeric/)
+    ).rejects.toThrowError(/should be alphanumeric/)
+  })
+
+  test('custom utilities work with `@apply`', async () => {
+    expect(
+      await compileCss(
+        css`
+          @utility foo {
+            @apply flex flex-col underline;
+          }
+
+          @utility bar {
+            @apply z-10;
+
+            .baz {
+              @apply z-20;
+            }
+          }
+
+          @tailwind utilities;
+        `,
+        ['foo', 'hover:foo', 'bar'],
+      ),
+    ).toMatchInlineSnapshot(`
+      ".bar {
+        z-index: 10;
+      }
+
+      .bar .baz {
+        z-index: 20;
+      }
+
+      .foo {
+        flex-direction: column;
+        text-decoration-line: underline;
+        display: flex;
+      }
+
+      @media (hover: hover) {
+        .hover\\:foo:hover {
+          flex-direction: column;
+          text-decoration-line: underline;
+          display: flex;
+        }
+      }"
+    `)
+  })
+
+  test('referencing custom utilities in custom utilities via `@apply` should work', async () => {
+    expect(
+      await compileCss(
+        css`
+          @utility foo {
+            @apply flex flex-col underline;
+          }
+
+          @utility bar {
+            @apply dark:foo flex-wrap;
+          }
+
+          @tailwind utilities;
+        `,
+        ['bar'],
+      ),
+    ).toMatchInlineSnapshot(`
+      ".bar {
+        flex-wrap: wrap;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .bar {
+          flex-direction: column;
+          text-decoration-line: underline;
+          display: flex;
+        }
+      }"
+    `)
+  })
+
+  test('custom utilities with `@apply` causing circular dependencies should error', async () => {
+    await expect(() =>
+      compileCss(
+        css`
+          @utility foo {
+            @apply flex-wrap hover:bar;
+          }
+
+          @utility bar {
+            @apply flex dark:foo;
+          }
+
+          @tailwind utilities;
+        `,
+        ['foo', 'bar'],
+      ),
+    ).rejects.toThrowErrorMatchingInlineSnapshot(
+      `[Error: You cannot \`@apply\` the \`hover:bar\` utility here because it creates a circular dependency.]`,
+    )
+  })
+
+  test('custom utilities with `@apply` causing circular dependencies should error (deeply nesting)', async () => {
+    await expect(() =>
+      compileCss(
+        css`
+          @utility foo {
+            .bar {
+              .baz {
+                .qux {
+                  @apply flex-wrap hover:bar;
+                }
+              }
+            }
+          }
+
+          @utility bar {
+            .baz {
+              .qux {
+                @apply flex dark:foo;
+              }
+            }
+          }
+
+          @tailwind utilities;
+        `,
+        ['foo', 'bar'],
+      ),
+    ).rejects.toThrowErrorMatchingInlineSnapshot(
+      `[Error: You cannot \`@apply\` the \`hover:bar\` utility here because it creates a circular dependency.]`,
+    )
+  })
+
+  test('custom utilities with `@apply` causing circular dependencies should error (multiple levels)', async () => {
+    await expect(() =>
+      compileCss(
+        css`
+          body {
+            @apply foo;
+          }
+
+          @utility foo {
+            @apply flex-wrap hover:bar;
+          }
+
+          @utility bar {
+            @apply flex dark:baz;
+          }
+
+          @utility baz {
+            @apply flex-wrap hover:foo;
+          }
+
+          @tailwind utilities;
+        `,
+        ['foo', 'bar'],
+      ),
+    ).rejects.toThrowErrorMatchingInlineSnapshot(
+      `[Error: You cannot \`@apply\` the \`hover:bar\` utility here because it creates a circular dependency.]`,
+    )
+  })
+
+  describe('functional utilities', () => {
+    test('resolving values from `@theme`', async () => {
+      let input = css`
+        @theme reference {
+          --tab-size-1: 1;
+          --tab-size-2: 2;
+          --tab-size-4: 4;
+          --tab-size-github: 8;
+        }
+
+        @utility tab-* {
+          tab-size: --value(--tab-size);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['tab-1', 'tab-2', 'tab-4', 'tab-github']))
+        .toMatchInlineSnapshot(`
+          ".tab-1 {
+            tab-size: var(--tab-size-1);
+          }
+
+          .tab-2 {
+            tab-size: var(--tab-size-2);
+          }
+
+          .tab-4 {
+            tab-size: var(--tab-size-4);
+          }
+
+          .tab-github {
+            tab-size: var(--tab-size-github);
+          }"
+        `)
+      expect(await compileCss(input, ['tab-3', 'tab-gitlab'])).toEqual('')
+    })
+
+    test('resolving values from `@theme`, with `--tab-size-*` syntax', async () => {
+      let input =
+        // Explicitly not using the css tagged template literal so that
+        // Prettier doesn't format the `value(--tab-size-*)` as
+        // `value(--tab-size- *)`
+        `
+          @theme reference {
+            --tab-size-1: 1;
+            --tab-size-2: 2;
+            --tab-size-4: 4;
+            --tab-size-github: 8;
+          }
+
+          @utility tab-* {
+            tab-size: --value(--tab-size-*);
+          }
+
+          @tailwind utilities;
+        `
+
+      expect(await compileCss(input, ['tab-1', 'tab-2', 'tab-4', 'tab-github']))
+        .toMatchInlineSnapshot(`
+          ".tab-1 {
+            tab-size: var(--tab-size-1);
+          }
+
+          .tab-2 {
+            tab-size: var(--tab-size-2);
+          }
+
+          .tab-4 {
+            tab-size: var(--tab-size-4);
+          }
+
+          .tab-github {
+            tab-size: var(--tab-size-github);
+          }"
+        `)
+      expect(await compileCss(input, ['tab-3', 'tab-gitlab'])).toEqual('')
+    })
+
+    test('resolving values from `@theme`, with `--tab-size-\\*` syntax (prettier friendly)', async () => {
+      let input = css`
+        @theme reference {
+          --tab-size-1: 1;
+          --tab-size-2: 2;
+          --tab-size-4: 4;
+          --tab-size-github: 8;
+        }
+
+        @utility tab-* {
+          tab-size: --value(--tab-size-\*);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['tab-1', 'tab-2', 'tab-4', 'tab-github']))
+        .toMatchInlineSnapshot(`
+          ".tab-1 {
+            tab-size: var(--tab-size-1);
+          }
+
+          .tab-2 {
+            tab-size: var(--tab-size-2);
+          }
+
+          .tab-4 {
+            tab-size: var(--tab-size-4);
+          }
+
+          .tab-github {
+            tab-size: var(--tab-size-github);
+          }"
+        `)
+      expect(await compileCss(input, ['tab-3', 'tab-gitlab'])).toEqual('')
+    })
+
+    test('resolving bare values', async () => {
+      let input = css`
+        @utility tab-* {
+          tab-size: --value(integer);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['tab-1', 'tab-76', 'tab-971'])).toMatchInlineSnapshot(`
+        ".tab-1 {
+          tab-size: 1;
+        }
+
+        .tab-76 {
+          tab-size: 76;
+        }
+
+        .tab-971 {
+          tab-size: 971;
+        }"
+      `)
+      expect(await compileCss(input, ['tab-foo'])).toEqual('')
+    })
+
+    test('resolving bare values with constraints for integer, percentage, and ratio', async () => {
+      let input = css`
+        @utility example-* {
+          --value-as-number: --value(number);
+          --value-as-percentage: --value(percentage);
+          --value-as-ratio: --value(ratio);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-1', 'example-0.5', 'example-20%', 'example-2/3']))
+        .toMatchInlineSnapshot(`
+        ".example-0\\.5 {
+          --value-as-number: .5;
+        }
+
+        .example-1 {
+          --value-as-number: 1;
+        }
+
+        .example-2\\/3 {
+          --value-as-ratio: 2 / 3;
+        }
+
+        .example-20\\% {
+          --value-as-percentage: 20%;
+        }"
+      `)
+      expect(
+        await compileCss(input, [
+          'example-1.23',
+          'example-12.34%',
+          'example-1.2/3',
+          'example-1/2.3',
+          'example-1.2/3.4',
+        ]),
+      ).toEqual('')
+    })
+
+    test('resolving unsupported bare values', async () => {
+      let input = css`
+        @utility tab-* {
+          tab-size: --value(color);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['tab-#0088cc', 'tab-foo'])).toEqual('')
+    })
+
+    test('resolving arbitrary values', async () => {
+      let input = css`
+        @utility tab-* {
+          tab-size: --value([integer]);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'tab-[1]',
+          'tab-[76]',
+          'tab-[971]',
+          'tab-[integer:var(--my-value)]',
+          'tab-(integer:my-value)',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".tab-\\[1\\] {
+          tab-size: 1;
+        }
+
+        .tab-\\[76\\] {
+          tab-size: 76;
+        }
+
+        .tab-\\[971\\] {
+          tab-size: 971;
+        }
+
+        .tab-\\[integer\\:var\\(--my-value\\)\\] {
+          tab-size: var(--my-value);
+        }"
+      `)
+      expect(
+        await compileCss(input, [
+          'tab-[#0088cc]',
+          'tab-[1px]',
+          'tab-[var(--my-value)]',
+          'tab-(--my-value)',
+          'tab-[color:var(--my-value)]',
+          'tab-(color:--my-value)',
+        ]),
+      ).toEqual('')
+    })
+
+    test('resolving any arbitrary values', async () => {
+      let input = css`
+        @utility tab-* {
+          tab-size: --value([ *]);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'tab-[1]',
+          'tab-[76]',
+          'tab-[971]',
+          'tab-[var(--my-value)]',
+          'tab-(--my-value)',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".tab-\\(--my-value\\) {
+          tab-size: var(--my-value);
+        }
+
+        .tab-\\[1\\] {
+          tab-size: 1;
+        }
+
+        .tab-\\[76\\] {
+          tab-size: 76;
+        }
+
+        .tab-\\[971\\] {
+          tab-size: 971;
+        }
+
+        .tab-\\[var\\(--my-value\\)\\] {
+          tab-size: var(--my-value);
+        }"
+      `)
+    })
+
+    test('resolving any arbitrary values (without space)', async () => {
+      let input = `
+        @utility tab-* {
+          tab-size: --value([*]);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'tab-[1]',
+          'tab-[76]',
+          'tab-[971]',
+          'tab-[var(--my-value)]',
+          'tab-(--my-value)',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".tab-\\(--my-value\\) {
+          tab-size: var(--my-value);
+        }
+
+        .tab-\\[1\\] {
+          tab-size: 1;
+        }
+
+        .tab-\\[76\\] {
+          tab-size: 76;
+        }
+
+        .tab-\\[971\\] {
+          tab-size: 971;
+        }
+
+        .tab-\\[var\\(--my-value\\)\\] {
+          tab-size: var(--my-value);
+        }"
+      `)
+    })
+
+    test('resolving any arbitrary values (with escaped `*`)', async () => {
+      let input = css`
+        @utility tab-* {
+          tab-size: --value([\*]);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'tab-[1]',
+          'tab-[76]',
+          'tab-[971]',
+          'tab-[var(--my-value)]',
+          'tab-(--my-value)',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".tab-\\(--my-value\\) {
+          tab-size: var(--my-value);
+        }
+
+        .tab-\\[1\\] {
+          tab-size: 1;
+        }
+
+        .tab-\\[76\\] {
+          tab-size: 76;
+        }
+
+        .tab-\\[971\\] {
+          tab-size: 971;
+        }
+
+        .tab-\\[var\\(--my-value\\)\\] {
+          tab-size: var(--my-value);
+        }"
+      `)
+    })
+
+    test('resolving theme, bare and arbitrary values all at once', async () => {
+      let input = css`
+        @theme reference {
+          --tab-size-github: 8;
+        }
+
+        @utility tab-* {
+          tab-size: --value([integer]);
+          tab-size: --value(integer);
+          tab-size: --value(--tab-size);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['tab-github', 'tab-76', 'tab-[123]'])).toMatchInlineSnapshot(`
+        ".tab-76 {
+          tab-size: 76;
+        }
+
+        .tab-\\[123\\] {
+          tab-size: 123;
+        }
+
+        .tab-github {
+          tab-size: var(--tab-size-github);
+        }"
+      `)
+      expect(await compileCss(input, ['tab-[#0088cc]', 'tab-[1px]'])).toEqual('')
+    })
+
+    test('in combination with calc to produce different data types of values', async () => {
+      let input = css`
+        @theme reference {
+          --example-full: 100%;
+        }
+
+        @utility example-* {
+          --value: --value([percentage]);
+          --value: calc(--value(integer) * 1%);
+          --value: --value(--example);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-full', 'example-12', 'example-[20%]']))
+        .toMatchInlineSnapshot(`
+          ".example-12 {
+            --value: calc(12 * 1%);
+          }
+
+          .example-\\[20\\%\\] {
+            --value: 20%;
+          }
+
+          .example-full {
+            --value: var(--example-full);
+          }"
+        `)
+      expect(await compileCss(input, ['example-half', 'example-[#0088cc]'])).toEqual('')
+    })
+
+    test('shorthand if resulting values are of the same type', async () => {
+      let input = css`
+        @theme reference {
+          --tab-size-github: 8;
+          --example-full: 100%;
+        }
+
+        @utility tab-* {
+          tab-size: --value(--tab-size, integer, [integer]);
+        }
+
+        @utility example-* {
+          --value: calc(--value(integer) * 1%);
+          --value: --value(--example, [percentage]);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'tab-github',
+          'tab-76',
+          'tab-[123]',
+          'example-37',
+          'example-[50%]',
+          'example-full',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".example-37 {
+          --value: calc(37 * 1%);
+        }
+
+        .example-\\[50\\%\\] {
+          --value: 50%;
+        }
+
+        .example-full {
+          --value: var(--example-full);
+        }
+
+        .tab-76 {
+          tab-size: 76;
+        }
+
+        .tab-\\[123\\] {
+          tab-size: 123;
+        }
+
+        .tab-github {
+          tab-size: var(--tab-size-github);
+        }"
+      `)
+      expect(
+        await compileCss(input, ['tab-[#0088cc]', 'tab-[1px]', 'example-foo', 'example-[13px]']),
+      ).toEqual('')
+    })
+
+    test('negative values', async () => {
+      let input = css`
+        @theme reference {
+          --example-full: 100%;
+        }
+
+        @utility example-* {
+          --value: --value(--example, [percentage], [length]);
+        }
+
+        @utility -example-* {
+          --value: calc(--value(--example, [percentage], [length]) * -1);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'example-full',
+          '-example-full',
+          'example-[10px]',
+          '-example-[10px]',
+          'example-[20%]',
+          '-example-[20%]',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".-example-\\[10px\\] {
+          --value: calc(10px * -1);
+        }
+
+        .-example-\\[20\\%\\] {
+          --value: calc(20% * -1);
+        }
+
+        .-example-full {
+          --value: calc(var(--example-full) * -1);
+        }
+
+        .example-\\[10px\\] {
+          --value: 10px;
+        }
+
+        .example-\\[20\\%\\] {
+          --value: 20%;
+        }
+
+        .example-full {
+          --value: var(--example-full);
+        }"
+      `)
+      expect(await compileCss(input, ['example-10'])).toEqual('')
+    })
+
+    test('using the same value multiple times', async () => {
+      let input = css`
+        @utility example-* {
+          --value: calc(var(--spacing) * --value(number)) calc(var(--spacing) * --value(number));
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-12'])).toMatchInlineSnapshot(`
+        ".example-12 {
+          --value: calc(var(--spacing) * 12) calc(var(--spacing) * 12);
+        }"
+      `)
+    })
+
+    test('using `--spacing(…)` shorthand', async () => {
+      let input = css`
+        @theme {
+          --spacing: 4px;
+        }
+
+        @utility example-* {
+          margin: --spacing(--value(number));
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-12'])).toMatchInlineSnapshot(`
+        ":root {
+          --spacing: 4px;
+        }
+
+        .example-12 {
+          margin: calc(var(--spacing) * 12);
+        }"
+      `)
+    })
+
+    test('using `--spacing(…)` shorthand (inline theme)', async () => {
+      let input = css`
+        @theme inline reference {
+          --spacing: 4px;
+        }
+
+        @utility example-* {
+          margin: --spacing(--value(number));
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-12'])).toMatchInlineSnapshot(`
+        ".example-12 {
+          margin: 48px;
+        }"
+      `)
+    })
+
+    test('modifiers', async () => {
+      let input = css`
+        @theme reference {
+          --value-sm: 14px;
+          --modifier-7: 28px;
+        }
+
+        @utility example-* {
+          --value: --value(--value, [length]);
+          --modifier: --modifier(--modifier, [length]);
+          --modifier-with-calc: calc(--modifier(--modifier, [length]) * 2);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(
+        await compileCss(input, [
+          'example-sm',
+          'example-sm/7',
+          'example-[12px]',
+          'example-[12px]/[16px]',
+        ]),
+      ).toMatchInlineSnapshot(`
+        ".example-\\[12px\\] {
+          --value: 12px;
+        }
+
+        .example-\\[12px\\]\\/\\[16px\\] {
+          --value: 12px;
+          --modifier: 16px;
+          --modifier-with-calc: calc(16px * 2);
+        }
+
+        .example-sm {
+          --value: var(--value-sm);
+        }
+
+        .example-sm\\/7 {
+          --value: var(--value-sm);
+          --modifier: var(--modifier-7);
+          --modifier-with-calc: calc(var(--modifier-7) * 2);
+        }"
+      `)
+      expect(
+        await compileCss(input, ['example-foo', 'example-foo/[12px]', 'example-foo/12']),
+      ).toEqual('')
+    })
+
+    test('fractions', async () => {
+      let input = css`
+        @theme reference {
+          --example-video: 16 / 9;
+        }
+
+        @utility example-* {
+          --value: --value(--example, ratio, [ratio]);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-video', 'example-1/1', 'example-[7/9]']))
+        .toMatchInlineSnapshot(`
+          ".example-1\\/1 {
+            --value: 1 / 1;
+          }
+
+          .example-\\[7\\/9\\] {
+            --value: 7 / 9;
+          }
+
+          .example-video {
+            --value: var(--example-video);
+          }"
+        `)
+      expect(await compileCss(input, ['example-foo'])).toEqual('')
+    })
+
+    test('resolve theme values with sub-namespace (--text- * --line-height)', async () => {
+      let input = css`
+        @theme reference {
+          --text-xs: 0.75rem;
+          --text-xs--line-height: calc(1 / 0.75);
+        }
+
+        @utility example-* {
+          font-size: --value(--text);
+          line-height: --value(--text- * --line-height);
+          line-height: --modifier(number);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-xs', 'example-xs/6'])).toMatchInlineSnapshot(`
+        ".example-xs {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+        }
+
+        .example-xs\\/6 {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+          line-height: 6;
+        }"
+      `)
+      expect(await compileCss(input, ['example-foo', 'example-xs/foo'])).toEqual('')
+    })
+
+    test('resolve theme values with sub-namespace (--text-\\* --line-height)', async () => {
+      let input = css`
+        @theme reference {
+          --text-xs: 0.75rem;
+          --text-xs--line-height: calc(1 / 0.75);
+        }
+
+        @utility example-* {
+          font-size: --value(--text);
+          line-height: --value(--text-\* --line-height);
+          line-height: --modifier(number);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-xs', 'example-xs/6'])).toMatchInlineSnapshot(`
+        ".example-xs {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+        }
+
+        .example-xs\\/6 {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+          line-height: 6;
+        }"
+      `)
+      expect(await compileCss(input, ['example-foo', 'example-xs/foo'])).toEqual('')
+    })
+
+    test('resolve theme values with sub-namespace (--value(--text --line-height))', async () => {
+      let input = css`
+        @theme reference {
+          --text-xs: 0.75rem;
+          --text-xs--line-height: calc(1 / 0.75);
+        }
+
+        @utility example-* {
+          font-size: --value(--text);
+          line-height: --value(--text --line-height);
+          line-height: --modifier(number);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-xs', 'example-xs/6'])).toMatchInlineSnapshot(`
+        ".example-xs {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+        }
+
+        .example-xs\\/6 {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+          line-height: 6;
+        }"
+      `)
+      expect(await compileCss(input, ['example-foo', 'example-xs/foo'])).toEqual('')
+    })
+
+    test('resolve theme values with sub-namespace (--value(--text-*--line-height))', async () => {
+      let input = `
+        @theme reference {
+          --text-xs: 0.75rem;
+          --text-xs--line-height: calc(1 / 0.75);
+        }
+
+        @utility example-* {
+          font-size: --value(--text);
+          line-height: --value(--text-*--line-height);
+          line-height: --modifier(number);
+        }
+
+        @tailwind utilities;
+      `
+
+      expect(await compileCss(input, ['example-xs', 'example-xs/6'])).toMatchInlineSnapshot(`
+        ".example-xs {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+        }
+
+        .example-xs\\/6 {
+          font-size: var(--text-xs);
+          line-height: var(--text-xs--line-height);
+          line-height: 6;
+        }"
+      `)
+      expect(await compileCss(input, ['example-foo', 'example-xs/foo'])).toEqual('')
+    })
+  })
+
+  test('resolve value based on `@theme`', async () => {
+    let input = css`
+      @theme {
+        --tab-size-github: 8;
+      }
+
+      @utility tab-* {
+        tab-size: --value(--tab-size);
+      }
+
+      @tailwind utilities;
+    `
+
+    expect(await compileCss(input, ['tab-github'])).toMatchInlineSnapshot(`
+      ":root {
+        --tab-size-github: 8;
+      }
+
+      .tab-github {
+        tab-size: var(--tab-size-github);
+      }"
+    `)
+  })
+
+  test('resolve value based on `@theme reference`', async () => {
+    let input = css`
+      @theme reference {
+        --tab-size-github: 8;
+      }
+
+      @utility tab-* {
+        tab-size: --value(--tab-size);
+      }
+
+      @tailwind utilities;
+    `
+
+    expect(await compileCss(input, ['tab-github'])).toMatchInlineSnapshot(`
+      ".tab-github {
+        tab-size: var(--tab-size-github);
+      }"
+    `)
+  })
+
+  test('resolve value based on `@theme inline`', async () => {
+    let input = css`
+      @theme inline {
+        --tab-size-github: 8;
+      }
+
+      @utility tab-* {
+        tab-size: --value(--tab-size);
+      }
+
+      @tailwind utilities;
+    `
+
+    expect(await compileCss(input, ['tab-github'])).toMatchInlineSnapshot(`
+      ":root {
+        --tab-size-github: 8;
+      }
+
+      .tab-github {
+        tab-size: 8;
+      }"
+    `)
+  })
+
+  test('resolve value based on `@theme inline reference`', async () => {
+    let input = css`
+      @theme inline reference {
+        --tab-size-github: 8;
+      }
+
+      @utility tab-* {
+        tab-size: --value(--tab-size);
+      }
+
+      @tailwind utilities;
+    `
+
+    expect(await compileCss(input, ['tab-github'])).toMatchInlineSnapshot(`
+      ".tab-github {
+        tab-size: 8;
+      }"
+    `)
+  })
+
+  test('sub namespaces can live in different @theme blocks (1)', async () => {
+    let input = `
+      @theme reference {
+        --text-xs: 0.75rem;
+      }
+
+      @theme inline reference {
+        --text-xs--line-height: calc(1 / 0.75);
+      }
+
+      @utility example-* {
+        font-size: --value(--text);
+        line-height: --value(--text-*--line-height);
+      }
+
+      @tailwind utilities;
+    `
+
+    expect(await compileCss(input, ['example-xs'])).toMatchInlineSnapshot(`
+      ".example-xs {
+        font-size: var(--text-xs);
+        line-height: 1.33333;
+      }"
+    `)
+  })
+
+  test('sub namespaces can live in different @theme blocks (2)', async () => {
+    let input = `
+      @theme inline reference {
+        --text-xs: 0.75rem;
+      }
+
+      @theme reference {
+        --text-xs--line-height: calc(1 / 0.75);
+      }
+
+      @utility example-* {
+        font-size: --value(--text);
+        line-height: --value(--text-*--line-height);
+      }
+
+      @tailwind utilities;
+    `
+
+    expect(await compileCss(input, ['example-xs'])).toMatchInlineSnapshot(`
+      ".example-xs {
+        font-size: .75rem;
+        line-height: var(--text-xs--line-height);
+      }"
+    `)
   })
 })

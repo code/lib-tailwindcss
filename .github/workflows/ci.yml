@@ -2,38 +2,57 @@ name: CI
 
 on:
   push:
-    branches: [master, next]
+    branches: [next]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  tests:
     strategy:
       fail-fast: false
       matrix:
         node-version: [20]
-        runner: [ubuntu-latest, windows-latest]
+        runner:
+          - name: Windows
+            os: windows-latest
 
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+          - name: Linux
+            os: namespace-profile-default
+
+          - name: macOS
+            os: macos-14
+
+        # Exclude windows and macos from being built on feature branches
+        on-next-branch:
+          - ${{ github.ref == 'refs/heads/next' }}
+        exclude:
+          - on-next-branch: false
+            runner:
+              name: Windows
+          - on-next-branch: false
+            runner:
+              name: macOS
+
+    runs-on: ${{ matrix.runner.os }}
+    timeout-minutes: 30
+
+    name: ${{ matrix.runner.name }}
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v3
-        with:
-          version: ^9.5.0
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
       # Cargo already skips downloading dependencies if they already exist
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -45,7 +64,7 @@ jobs:
 
       # Cache the `oxide` Rust build
       - name: Cache oxide build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ./target/
@@ -59,17 +78,17 @@ jobs:
 
       - name: Build
         run: pnpm run build
+        env:
+          CARGO_PROFILE_RELEASE_LTO: 'off'
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: 'lld-link'
 
       - name: Lint
         run: pnpm run lint
-        # Only lint on linux to avoind \r\n line ending errors
-        if: matrix.runner == 'ubuntu-latest'
+        # Only lint on linux to avoid \r\n line ending errors
+        if: matrix.runner.os == 'ubuntu-latest'
 
       - name: Test
         run: pnpm run test
-
-      - name: Integration Tests
-        run: pnpm run test:integrations
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
@@ -77,9 +96,9 @@ jobs:
       - name: Run Playwright tests
         run: npm run test:ui
 
-      - uses: actions/upload-artifact@v3
-        if: always()
+      - name: Notify Discord
+        if: failure() && github.ref == 'refs/heads/next'
+        uses: discord-actions/message@v2
         with:
-          name: playwright-report
-          path: packages/tailwindcss/playwright-report/
-          retention-days: 30
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          message: 'The [most recent build](<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}>) on the `next` branch has failed.'

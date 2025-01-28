@@ -1,7 +1,18 @@
-import { WalkAction, rule, walk, type AstNode, type Rule } from './ast'
+import {
+  atRule,
+  decl,
+  rule,
+  walk,
+  WalkAction,
+  type AstNode,
+  type Rule,
+  type StyleRule,
+} from './ast'
 import { type Candidate, type Variant } from './candidate'
+import { substituteFunctions } from './css-functions'
 import { type DesignSystem } from './design-system'
 import GLOBAL_PROPERTY_ORDER from './property-order'
+import { asColor, type Utility } from './utilities'
 import { compare } from './utils/compare'
 import { escape } from './utils/escape'
 import type { Variants } from './variants'
@@ -16,51 +27,77 @@ export function compileCandidates(
     { properties: number[]; variants: bigint; candidate: string }
   >()
   let astNodes: AstNode[] = []
-  let candidates = new Map<Candidate, string>()
+  let matches = new Map<string, Candidate[]>()
 
   // Parse candidates and variants
   for (let rawCandidate of rawCandidates) {
-    let candidate = designSystem.parseCandidate(rawCandidate)
-    if (candidate === null) {
+    if (designSystem.invalidCandidates.has(rawCandidate)) {
       onInvalidCandidate?.(rawCandidate)
       continue // Bail, invalid candidate
     }
-    candidates.set(candidate, rawCandidate)
+
+    let candidates = designSystem.parseCandidate(rawCandidate)
+    if (candidates.length === 0) {
+      onInvalidCandidate?.(rawCandidate)
+      continue // Bail, invalid candidate
+    }
+
+    matches.set(rawCandidate, candidates)
   }
 
-  // Sort the variants
-  let variants = designSystem.getUsedVariants().sort((a, z) => {
-    return designSystem.variants.compare(a, z)
-  })
+  let variantOrderMap = designSystem.getVariantOrder()
 
   // Create the AST
-  next: for (let [candidate, rawCandidate] of candidates) {
-    let astNode = designSystem.compileAstNodes(rawCandidate)
-    if (astNode === null) {
+  for (let [rawCandidate, candidates] of matches) {
+    let found = false
+
+    for (let candidate of candidates) {
+      let rules = designSystem.compileAstNodes(candidate)
+      if (rules.length === 0) continue
+
+      // Arbitrary values (`text-[theme(--color-red-500)]`) and arbitrary
+      // properties (`[--my-var:theme(--color-red-500)]`) can contain function
+      // calls so we need evaluate any functions we find there that weren't in
+      // the source CSS.
+      try {
+        substituteFunctions(
+          rules.map(({ node }) => node),
+          designSystem,
+        )
+      } catch (err) {
+        // If substitution fails then the candidate likely contains a call to
+        // `theme()` that is invalid which may be because of incorrect usage,
+        // invalid arguments, or a theme key that does not exist.
+        continue
+      }
+
+      found = true
+
+      for (let { node, propertySort } of rules) {
+        // Track the variant order which is a number with each bit representing a
+        // variant. This allows us to sort the rules based on the order of
+        // variants used.
+        let variantOrder = 0n
+        for (let variant of candidate.variants) {
+          variantOrder |= 1n << BigInt(variantOrderMap.get(variant)!)
+        }
+
+        nodeSorting.set(node, {
+          properties: propertySort,
+          variants: variantOrder,
+          candidate: rawCandidate,
+        })
+        astNodes.push(node)
+      }
+    }
+
+    if (!found) {
       onInvalidCandidate?.(rawCandidate)
-      continue next
     }
-
-    let { node, propertySort } = astNode
-
-    // Track the variant order which is a number with each bit representing a
-    // variant. This allows us to sort the rules based on the order of
-    // variants used.
-    let variantOrder = 0n
-    for (let variant of candidate.variants) {
-      variantOrder |= 1n << BigInt(variants.indexOf(variant))
-    }
-
-    nodeSorting.set(node, {
-      properties: propertySort,
-      variants: variantOrder,
-      candidate: rawCandidate,
-    })
-    astNodes.push(node)
   }
 
   astNodes.sort((a, z) => {
-    // Safety: At this point it is safe to use TypeScript's non-null assertion
+    // SAFETY: At this point it is safe to use TypeScript's non-null assertion
     // operator because if the ast nodes didn't exist, we introduced a bug
     // above, but there is no need to re-check just to be sure. If this relied
     // on pure user input, then we would need to check for its existence.
@@ -98,78 +135,66 @@ export function compileCandidates(
   }
 }
 
-export function compileAstNodes(rawCandidate: string, designSystem: DesignSystem) {
-  let candidate = designSystem.parseCandidate(rawCandidate)
-  if (candidate === null) return null
+export function compileAstNodes(candidate: Candidate, designSystem: DesignSystem) {
+  let asts = compileBaseUtility(candidate, designSystem)
+  if (asts.length === 0) return []
 
-  let nodes: AstNode[] = []
+  let rules: {
+    node: AstNode
+    propertySort: number[]
+  }[] = []
 
-  // Handle arbitrary properties
-  if (candidate.kind === 'arbitrary') {
-    let compileFn = designSystem.utilities.getArbitrary()
+  let selector = `.${escape(candidate.raw)}`
 
-    // Build the node
-    let compiledNodes = compileFn(candidate)
-    if (compiledNodes === undefined) return null
+  for (let nodes of asts) {
+    let propertySort = getPropertySort(nodes)
 
-    nodes = compiledNodes
-  }
-
-  // Handle named utilities
-  else if (candidate.kind === 'static' || candidate.kind === 'functional') {
-    let fns = designSystem.utilities.get(candidate.root)
-
-    // Build the node
-    let compiledNodes: AstNode[] | undefined
-
-    for (let i = fns.length - 1; i >= 0; i--) {
-      let fn = fns[i]
-
-      if (candidate.kind !== fn.kind) continue
-
-      compiledNodes = fn.compileFn(candidate)
-      if (compiledNodes) break
+    if (candidate.important || designSystem.important) {
+      applyImportant(nodes)
     }
 
-    if (compiledNodes === undefined) return null
+    let node: StyleRule = {
+      kind: 'rule',
+      selector,
+      nodes,
+    }
 
-    nodes = compiledNodes
+    for (let variant of candidate.variants) {
+      let result = applyVariant(node, variant, designSystem.variants)
+
+      // When the variant results in `null`, it means that the variant cannot be
+      // applied to the rule. Discard the candidate and continue to the next
+      // one.
+      if (result === null) return []
+    }
+
+    rules.push({
+      node,
+      propertySort,
+    })
   }
 
-  let propertySort = getPropertySort(nodes)
-
-  if (candidate.important) {
-    applyImportant(nodes)
-  }
-
-  let node: Rule = {
-    kind: 'rule',
-    selector: `.${escape(rawCandidate)}`,
-    nodes,
-  }
-
-  for (let variant of candidate.variants) {
-    let result = applyVariant(node, variant, designSystem.variants)
-
-    // When the variant results in `null`, it means that the variant cannot be
-    // applied to the rule. Discard the candidate and continue to the next
-    // one.
-    if (result === null) return null
-  }
-
-  return {
-    node,
-    propertySort,
-  }
+  return rules
 }
 
-export function applyVariant(node: Rule, variant: Variant, variants: Variants): null | void {
+export function applyVariant(
+  node: Rule,
+  variant: Variant,
+  variants: Variants,
+  depth: number = 0,
+): null | void {
   if (variant.kind === 'arbitrary') {
+    // Relative selectors are not valid as an entire arbitrary variant, only as
+    // an arbitrary variant that is part of another compound variant.
+    //
+    // E.g. `[>img]:flex` is not valid, but `has-[>img]:flex` is
+    if (variant.relative && depth === 0) return null
+
     node.nodes = [rule(variant.selector, node.nodes)]
     return
   }
 
-  // Safety: At this point it is safe to use TypeScript's non-null assertion
+  // SAFETY: At this point it is safe to use TypeScript's non-null assertion
   // operator because if the `candidate.root` didn't exist, `parseCandidate`
   // would have returned `null` and we would have returned early resulting in
   // not hitting this code path.
@@ -189,10 +214,19 @@ export function applyVariant(node: Rule, variant: Variant, variants: Variants): 
     // To solve this, we provide an isolated placeholder node to the variant.
     // The variant can now apply its logic to the isolated node without
     // affecting the original node.
-    let isolatedNode = rule('@slot', [])
+    let isolatedNode = atRule('@slot')
 
-    let result = applyVariant(isolatedNode, variant.variant, variants)
+    let result = applyVariant(isolatedNode, variant.variant, variants, depth + 1)
     if (result === null) return null
+
+    if (variant.root === 'not' && isolatedNode.nodes.length > 1) {
+      // The `not` variant cannot negate sibling rules / at-rules because these
+      // are an OR relationship. Doing so would require transforming sibling
+      // nodes into nesting while negating them. This isn't possible with the
+      // current implementation of the `not` variant or with how variants are
+      // applied in general (on a per-node basis).
+      return null
+    }
 
     for (let child of isolatedNode.nodes) {
       // Only some variants wrap children in rules. For example, the `force`
@@ -202,16 +236,16 @@ export function applyVariant(node: Rule, variant: Variant, variants: Variants): 
       // This means `child` may be a declaration and we don't want to apply the
       // variant to it. This also means the entire variant as a whole is not
       // applicable to the rule and should generate nothing.
-      if (child.kind !== 'rule') return null
+      if (child.kind !== 'rule' && child.kind !== 'at-rule') return null
 
-      let result = applyFn(child as Rule, variant)
+      let result = applyFn(child, variant)
       if (result === null) return null
     }
 
     // Replace the placeholder node with the actual node
     {
       walk(isolatedNode.nodes, (child) => {
-        if (child.kind === 'rule' && child.nodes.length <= 0) {
+        if ((child.kind === 'rule' || child.kind === 'at-rule') && child.nodes.length <= 0) {
           child.nodes = node.nodes
           return WalkAction.Skip
         }
@@ -226,17 +260,66 @@ export function applyVariant(node: Rule, variant: Variant, variants: Variants): 
   if (result === null) return null
 }
 
+function isFallbackUtility(utility: Utility) {
+  let types = utility.options?.types ?? []
+  return types.length > 1 && types.includes('any')
+}
+
+function compileBaseUtility(candidate: Candidate, designSystem: DesignSystem) {
+  if (candidate.kind === 'arbitrary') {
+    let value: string | null = candidate.value
+
+    // Assumption: If an arbitrary property has a modifier, then we assume it
+    // is an opacity modifier.
+    if (candidate.modifier) {
+      value = asColor(value, candidate.modifier, designSystem.theme)
+    }
+
+    if (value === null) return []
+
+    return [[decl(candidate.property, value)]]
+  }
+
+  let utilities = designSystem.utilities.get(candidate.root) ?? []
+
+  let asts: AstNode[][] = []
+
+  let normalUtilities = utilities.filter((u) => !isFallbackUtility(u))
+  for (let utility of normalUtilities) {
+    if (utility.kind !== candidate.kind) continue
+
+    let compiledNodes = utility.compileFn(candidate)
+    if (compiledNodes === undefined) continue
+    if (compiledNodes === null) return asts
+    asts.push(compiledNodes)
+  }
+
+  if (asts.length > 0) return asts
+
+  let fallbackUtilities = utilities.filter((u) => isFallbackUtility(u))
+  for (let utility of fallbackUtilities) {
+    if (utility.kind !== candidate.kind) continue
+
+    let compiledNodes = utility.compileFn(candidate)
+    if (compiledNodes === undefined) continue
+    if (compiledNodes === null) return asts
+    asts.push(compiledNodes)
+  }
+
+  return asts
+}
+
 function applyImportant(ast: AstNode[]): void {
   for (let node of ast) {
-    // Skip any `@at-root` rules — we don't want to make the contents of things
+    // Skip any `AtRoot` nodes — we don't want to make the contents of things
     // like `@keyframes` or `@property` important.
-    if (node.kind === 'rule' && node.selector === '@at-root') {
+    if (node.kind === 'at-root') {
       continue
     }
 
     if (node.kind === 'declaration') {
       node.important = true
-    } else if (node.kind === 'rule') {
+    } else if (node.kind === 'rule' || node.kind === 'at-rule') {
       applyImportant(node.nodes)
     }
   }
@@ -248,12 +331,12 @@ function getPropertySort(nodes: AstNode[]) {
   let q: AstNode[] = nodes.slice()
 
   while (q.length > 0) {
-    // Safety: At this point it is safe to use TypeScript's non-null assertion
+    // SAFETY: At this point it is safe to use TypeScript's non-null assertion
     // operator because we guarded against `q.length > 0` above.
     let node = q.shift()!
     if (node.kind === 'declaration') {
       if (node.property === '--tw-sort') {
-        let idx = GLOBAL_PROPERTY_ORDER.indexOf(node.value)
+        let idx = GLOBAL_PROPERTY_ORDER.indexOf(node.value ?? '')
         if (idx !== -1) {
           propertySort.add(idx)
           break
@@ -262,11 +345,7 @@ function getPropertySort(nodes: AstNode[]) {
 
       let idx = GLOBAL_PROPERTY_ORDER.indexOf(node.property)
       if (idx !== -1) propertySort.add(idx)
-    } else if (node.kind === 'rule') {
-      // Don't consider properties within `@at-root` when determining the sort
-      // order for a rule.
-      if (node.selector === '@at-root') continue
-
+    } else if (node.kind === 'rule' || node.kind === 'at-rule') {
       for (let child of node.nodes) {
         q.push(child)
       }

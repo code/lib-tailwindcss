@@ -1,6 +1,6 @@
 {
   "name": "tailwindcss",
-  "version": "4.0.0-alpha.18",
+  "version": "4.0.0",
   "description": "A utility-first CSS framework for rapidly building custom user interfaces.",
   "license": "MIT",
   "repository": {
@@ -23,6 +23,34 @@
       "require": "./dist/lib.js",
       "import": "./src/index.ts"
     },
+    "./colors": {
+      "require": "./src/compat/colors.cts",
+      "import": "./src/compat/colors.ts"
+    },
+    "./colors.js": {
+      "require": "./src/compat/colors.cts",
+      "import": "./src/compat/colors.ts"
+    },
+    "./lib/util/flattenColorPalette": {
+      "require": "./src/compat/flatten-color-palette.cts",
+      "import": "./src/compat/flatten-color-palette.ts"
+    },
+    "./defaultTheme": {
+      "require": "./src/compat/default-theme.cts",
+      "import": "./src/compat/default-theme.ts"
+    },
+    "./defaultTheme.js": {
+      "require": "./src/compat/default-theme.cts",
+      "import": "./src/compat/default-theme.ts"
+    },
+    "./plugin": {
+      "require": "./src/plugin.cts",
+      "import": "./src/plugin.ts"
+    },
+    "./plugin.js": {
+      "require": "./src/plugin.cts",
+      "import": "./src/plugin.ts"
+    },
     "./package.json": "./package.json",
     "./index.css": "./index.css",
     "./index": "./index.css",
@@ -42,6 +70,34 @@
         "style": "./index.css",
         "require": "./dist/lib.js",
         "import": "./dist/lib.mjs"
+      },
+      "./plugin": {
+        "require": "./dist/plugin.js",
+        "import": "./dist/plugin.mjs"
+      },
+      "./plugin.js": {
+        "require": "./dist/plugin.js",
+        "import": "./dist/plugin.mjs"
+      },
+      "./defaultTheme": {
+        "require": "./dist/default-theme.js",
+        "import": "./dist/default-theme.mjs"
+      },
+      "./defaultTheme.js": {
+        "require": "./dist/default-theme.js",
+        "import": "./dist/default-theme.mjs"
+      },
+      "./colors": {
+        "require": "./dist/colors.js",
+        "import": "./dist/colors.mjs"
+      },
+      "./colors.js": {
+        "require": "./dist/colors.js",
+        "import": "./dist/colors.mjs"
+      },
+      "./lib/util/flattenColorPalette": {
+        "require": "./dist/flatten-color-palette.js",
+        "import": "./dist/flatten-color-palette.mjs"
       },
       "./package.json": "./package.json",
       "./index.css": "./index.css",
@@ -65,6 +121,7 @@
   "devDependencies": {
     "@tailwindcss/oxide": "workspace:^",
     "@types/node": "catalog:",
-    "lightningcss": "^1.25.1"
+    "lightningcss": "catalog:",
+    "dedent": "1.5.3"
   }
 }
