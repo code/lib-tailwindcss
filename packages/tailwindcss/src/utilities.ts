@@ -1,14 +1,35 @@
-import { decl, rule, type AstNode, type Rule } from './ast'
+import {
+  atRoot,
+  atRule,
+  decl,
+  styleRule,
+  walk,
+  type AstNode,
+  type AtRule,
+  type Declaration,
+  type Rule,
+} from './ast'
 import type { Candidate, CandidateModifier, NamedUtilityValue } from './candidate'
-import type { ColorThemeKey, Theme, ThemeKey } from './theme'
+import type { DesignSystem } from './design-system'
+import type { Theme, ThemeKey } from './theme'
+import { compareBreakpoints } from './utils/compare-breakpoints'
 import { DefaultMap } from './utils/default-map'
-import { inferDataType } from './utils/infer-data-type'
+import {
+  inferDataType,
+  isPositiveInteger,
+  isValidOpacityValue,
+  isValidSpacingMultiplier,
+} from './utils/infer-data-type'
 import { replaceShadowColors } from './utils/replace-shadow-colors'
 import { segment } from './utils/segment'
+import * as ValueParser from './value-parser'
+
+const IS_VALID_STATIC_UTILITY_NAME = /^-?[a-z][a-zA-Z0-9/%._-]*$/
+const IS_VALID_FUNCTIONAL_UTILITY_NAME = /^-?[a-z][a-zA-Z0-9/%._-]*-\*$/
 
 type CompileFn<T extends Candidate['kind']> = (
   value: Extract<Candidate, { kind: T }>,
-) => AstNode[] | undefined
+) => AstNode[] | undefined | null
 
 interface SuggestionGroup {
   supportsNegative?: boolean
@@ -27,15 +48,18 @@ type SuggestionDefinition =
       hasDefaultValue?: boolean
     }
 
+export type UtilityOptions = {
+  types: string[]
+}
+
+export type Utility = {
+  kind: 'static' | 'functional'
+  compileFn: CompileFn<any>
+  options?: UtilityOptions
+}
+
 export class Utilities {
-  private arbitraryFn!: CompileFn<'arbitrary'>
-  private utilities = new DefaultMap<
-    string,
-    {
-      kind: 'static' | 'functional'
-      compileFn: CompileFn<any>
-    }[]
-  >(() => [])
+  private utilities = new DefaultMap<string, Utility[]>(() => [])
 
   private completions = new Map<string, () => SuggestionGroup[]>()
 
@@ -43,12 +67,8 @@ export class Utilities {
     this.utilities.get(name).push({ kind: 'static', compileFn })
   }
 
-  functional(name: string, compileFn: CompileFn<'functional'>) {
-    this.utilities.get(name).push({ kind: 'functional', compileFn })
-  }
-
-  arbitrary(compileFn: CompileFn<'arbitrary'>) {
-    this.arbitraryFn = compileFn
+  functional(name: string, compileFn: CompileFn<'functional'>, options?: UtilityOptions) {
+    this.utilities.get(name).push({ kind: 'functional', compileFn, options })
   }
 
   has(name: string, kind: 'static' | 'functional') {
@@ -83,18 +103,10 @@ export class Utilities {
 
     return keys
   }
-
-  getArbitrary() {
-    return this.arbitraryFn
-  }
-}
-
-function atRoot(rules: Rule[]) {
-  return rule('@at-root', rules)
 }
 
 function property(ident: string, initialValue?: string, syntax?: string) {
-  return rule(`@property ${ident}`, [
+  return atRule('@property', ident, [
     decl('syntax', syntax ? `"${syntax}"` : `"*"`),
     decl('inherits', 'false'),
 
@@ -110,7 +122,7 @@ function property(ident: string, initialValue?: string, syntax?: string) {
 /**
  * Apply opacity to a color using `color-mix`.
  */
-function withAlpha(value: string, alpha: string): string {
+export function withAlpha(value: string, alpha: string): string {
   if (alpha === null) return value
 
   // Convert numeric values (like `0.5`) to percentages (like `50%`) so they
@@ -121,20 +133,17 @@ function withAlpha(value: string, alpha: string): string {
     alpha = `${alphaAsNumber * 100}%`
   }
 
-  // If the alpha value is a percentage, we can pass it directly to
-  // `color-mix()`. In any other case, e.g.: `var(…)`, `round(…)`, … we need to
-  // make sure it's a percentage.
-  else if (alpha[alpha.length - 1] !== '%') {
-    alpha = `calc(${alpha} * 100%)`
-  }
-
-  return `color-mix(in srgb, ${value} ${alpha}, transparent)`
+  return `color-mix(in oklab, ${value} ${alpha}, transparent)`
 }
 
 /**
  * Resolve a color value + optional opacity modifier to a final color.
  */
-function asColor(value: string, modifier: CandidateModifier | null, theme: Theme): string | null {
+export function asColor(
+  value: string,
+  modifier: CandidateModifier | null,
+  theme: Theme,
+): string | null {
   if (!modifier) return value
 
   if (modifier.kind === 'arbitrary') {
@@ -148,22 +157,12 @@ function asColor(value: string, modifier: CandidateModifier | null, theme: Theme
     return withAlpha(value, alpha)
   }
 
-  if (Number.isNaN(Number(modifier.value))) {
+  if (!isValidOpacityValue(modifier.value)) {
     return null
   }
 
   // The modifier is a bare value like `50`, so convert that to `50%`.
   return withAlpha(value, `${modifier.value}%`)
-}
-
-/**
- * Negate a numeric value — literals get simplified by Lightning CSS.
- */
-function withNegative(
-  value: string,
-  candidate: Extract<Candidate, { kind: 'static' | 'functional' }>,
-) {
-  return candidate.negative ? `calc(${value} * -1)` : value
 }
 
 /**
@@ -173,7 +172,7 @@ function withNegative(
  * The values `inherit`, `transparent` and `current` are special-cased as they
  * are universal and don't need to be resolved from the theme.
  */
-function resolveThemeColor<T extends ColorThemeKey>(
+function resolveThemeColor<T extends ThemeKey>(
   candidate: Extract<Candidate, { kind: 'functional' }>,
   theme: Theme,
   themeKeys: T[],
@@ -215,20 +214,6 @@ function resolveThemeColor<T extends ColorThemeKey>(
 export function createUtilities(theme: Theme) {
   let utilities = new Utilities()
 
-  utilities.arbitrary((candidate) => {
-    let value: string | null = candidate.value
-
-    // Assumption: If an arbitrary property has a modifier, then we assume it
-    // is an opacity modifier.
-    if (candidate.modifier) {
-      value = asColor(value, candidate.modifier, theme)
-    }
-
-    if (value === null) return
-
-    return [decl(candidate.property, value)]
-  })
-
   /**
    * Register list of suggestions for a class
    */
@@ -269,9 +254,7 @@ export function createUtilities(theme: Theme) {
    * Register a static utility class like `justify-center`.
    */
   function staticUtility(className: string, declarations: ([string, string] | (() => AstNode))[]) {
-    utilities.static(className, (candidate) => {
-      if (candidate.negative) return
-
+    utilities.static(className, () => {
       return declarations.map((node) => {
         return typeof node === 'function' ? node() : decl(node[0], node[1])
       })
@@ -284,6 +267,7 @@ export function createUtilities(theme: Theme) {
     themeKeys?: ThemeKey[]
     defaultValue?: string | null
     handleBareValue?: (value: NamedUtilityValue) => string | null
+    handleNegativeBareValue?: (value: NamedUtilityValue) => string | null
     handle: (value: string) => AstNode[] | undefined
   }
 
@@ -292,53 +276,64 @@ export function createUtilities(theme: Theme) {
    * user's theme.
    */
   function functionalUtility(classRoot: string, desc: UtilityDescription) {
-    utilities.functional(classRoot, (candidate) => {
-      // If the class candidate has a negative prefix (like `-mx-2`) but this
-      // utility doesn't support negative values (like the `width` utility),
-      // don't generate any rules.
-      if (candidate.negative && !desc.supportsNegative) return
+    function handleFunctionalUtility({ negative }: { negative: boolean }) {
+      return (candidate: Extract<Candidate, { kind: 'functional' }>) => {
+        let value: string | null = null
 
-      let value: string | null = null
+        if (!candidate.value) {
+          if (candidate.modifier) return
 
-      if (!candidate.value) {
-        if (candidate.modifier) return
+          // If the candidate has no value segment (like `rounded`), use the
+          // `defaultValue` (for candidates like `grow` that have no theme
+          // values) or a bare theme value (like `--radius` for `rounded`). No
+          // utility will ever support both of these.
+          value =
+            desc.defaultValue !== undefined
+              ? desc.defaultValue
+              : theme.resolve(null, desc.themeKeys ?? [])
+        } else if (candidate.value.kind === 'arbitrary') {
+          if (candidate.modifier) return
+          value = candidate.value.value
+        } else {
+          value = theme.resolve(
+            candidate.value.fraction ?? candidate.value.value,
+            desc.themeKeys ?? [],
+          )
 
-        // If the candidate has no value segment (like `rounded`), use the
-        // `defaultValue` (for candidates like `grow` that have no theme values)
-        // or a bare theme value (like `--radius` for `rounded`). No utility
-        // will ever support both of these.
-        value = desc.defaultValue ?? theme.resolve(null, desc.themeKeys ?? [])
-      } else if (candidate.value.kind === 'arbitrary') {
-        if (candidate.modifier) return
-        value = candidate.value.value
-      } else {
-        value = theme.resolve(
-          candidate.value.fraction ?? candidate.value.value,
-          desc.themeKeys ?? [],
-        )
+          // Automatically handle things like `w-1/2` without requiring `1/2` to
+          // exist as a theme value.
+          if (value === null && desc.supportsFractions && candidate.value.fraction) {
+            let [lhs, rhs] = segment(candidate.value.fraction, '/')
+            if (!isPositiveInteger(lhs) || !isPositiveInteger(rhs)) return
+            value = `calc(${candidate.value.fraction} * 100%)`
+          }
 
-        // Automatically handle things like `w-1/2` without requiring `1/2` to
-        // exist as a theme value.
-        if (value === null && desc.supportsFractions && candidate.value.fraction) {
-          let [lhs, rhs] = segment(candidate.value.fraction, '/')
-          if (!Number.isInteger(Number(lhs)) || !Number.isInteger(Number(rhs))) return
-          value = `calc(${candidate.value.fraction} * 100%)`
+          // If there is still no value but the utility supports bare values,
+          // then use the bare candidate value as the value.
+          if (value === null && negative && desc.handleNegativeBareValue) {
+            value = desc.handleNegativeBareValue(candidate.value)
+            if (!value?.includes('/') && candidate.modifier) return
+            if (value !== null) return desc.handle(value)
+          }
+
+          if (value === null && desc.handleBareValue) {
+            value = desc.handleBareValue(candidate.value)
+            if (!value?.includes('/') && candidate.modifier) return
+          }
         }
 
-        // If there is still no value but the utility supports bare values, then
-        // use the bare candidate value as the value.
-        if (value === null && desc.handleBareValue) {
-          value = desc.handleBareValue(candidate.value)
-          if (!value?.includes('/') && candidate.modifier) return
-        }
+        // If there is no value, don't generate any rules.
+        if (value === null) return
+
+        // Negate the value if the candidate has a negative prefix.
+        return desc.handle(negative ? `calc(${value} * -1)` : value)
       }
+    }
 
-      // If there is no value, don't generate any rules.
-      if (value === null) return
-
-      // Negate the value if the candidate has a negative prefix.
-      return desc.handle(withNegative(value, candidate))
-    })
+    if (desc.supportsNegative) {
+      utilities.functional(`-${classRoot}`, handleFunctionalUtility({ negative: true }))
+    }
+    utilities.functional(classRoot, handleFunctionalUtility({ negative: false }))
 
     suggest(classRoot, () => [
       {
@@ -350,7 +345,7 @@ export function createUtilities(theme: Theme) {
   }
 
   type ColorUtilityDescription = {
-    themeKeys: ColorThemeKey[]
+    themeKeys: ThemeKey[]
     handle: (value: string) => AstNode[] | undefined
   }
 
@@ -363,10 +358,6 @@ export function createUtilities(theme: Theme) {
       // Color utilities have to have a value, like the `red-500` in
       // `bg-red-500`, otherwise they would be static utilities.
       if (!candidate.value) return
-
-      // Color utilities never support negative values as there's no sensible
-      // way to negate a color.
-      if (candidate.negative) return
 
       // Find the actual CSS value that the candidate value maps to.
       let value: string | null = null
@@ -392,7 +383,90 @@ export function createUtilities(theme: Theme) {
         values: ['current', 'inherit', 'transparent'],
         valueThemeKeys: desc.themeKeys,
         modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
+      },
+    ])
+  }
+
+  function spacingUtility(
+    name: string,
+    themeKeys: ThemeKey[],
+    handle: (value: string) => AstNode[] | undefined,
+    {
+      supportsNegative = false,
+      supportsFractions = false,
+    }: {
+      supportsNegative?: boolean
+      supportsFractions?: boolean
+    } = {},
+  ) {
+    if (supportsNegative) {
+      utilities.static(`-${name}-px`, () => handle('-1px'))
+    }
+    utilities.static(`${name}-px`, () => handle('1px'))
+    functionalUtility(name, {
+      themeKeys,
+      supportsFractions,
+      supportsNegative,
+      defaultValue: null,
+      handleBareValue: ({ value }) => {
+        let multiplier = theme.resolve(null, ['--spacing'])
+        if (!multiplier) return null
+        if (!isValidSpacingMultiplier(value)) return null
+
+        return `calc(${multiplier} * ${value})`
+      },
+      handleNegativeBareValue: ({ value }) => {
+        let multiplier = theme.resolve(null, ['--spacing'])
+        if (!multiplier) return null
+        if (!isValidSpacingMultiplier(value)) return null
+
+        return `calc(${multiplier} * -${value})`
+      },
+      handle,
+    })
+
+    suggest(name, () => [
+      {
+        values: theme.get(['--spacing'])
+          ? [
+              '0',
+              '0.5',
+              '1',
+              '1.5',
+              '2',
+              '2.5',
+              '3',
+              '3.5',
+              '4',
+              '5',
+              '6',
+              '7',
+              '8',
+              '9',
+              '10',
+              '11',
+              '12',
+              '14',
+              '16',
+              '20',
+              '24',
+              '28',
+              '32',
+              '36',
+              '40',
+              '44',
+              '48',
+              '52',
+              '56',
+              '60',
+              '64',
+              '72',
+              '80',
+              '96',
+            ]
+          : [],
+        supportsNegative,
+        valueThemeKeys: themeKeys,
       },
     ])
   }
@@ -450,130 +524,25 @@ export function createUtilities(theme: Theme) {
   /**
    * @css `inset`
    */
-  staticUtility('inset-auto', [['inset', 'auto']])
-  utilities.static('inset-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('inset', value)]
-  })
-  functionalUtility('inset', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('inset', value)],
-  })
-
-  staticUtility('inset-x-auto', [
-    ['--tw-sort', 'inset-inline'],
-    ['right', 'auto'],
-    ['left', 'auto'],
-  ])
-
-  utilities.static('inset-x-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('--tw-sort', 'inset-inline'), decl('right', value), decl('left', value)]
-  })
-  functionalUtility('inset-x', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [
-      decl('--tw-sort', 'inset-inline'),
-      decl('right', value),
-      decl('left', value),
-    ],
-  })
-
-  staticUtility('inset-y-auto', [
-    ['--tw-sort', 'inset-block'],
-    ['top', 'auto'],
-    ['bottom', 'auto'],
-  ])
-  utilities.static('inset-y-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('--tw-sort', 'inset-block'), decl('top', value), decl('bottom', value)]
-  })
-  functionalUtility('inset-y', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [
-      decl('--tw-sort', 'inset-block'),
-      decl('top', value),
-      decl('bottom', value),
-    ],
-  })
-
-  staticUtility('start-auto', [['inset-inline-start', 'auto']])
-  utilities.static('start-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('inset-inline-start', value)]
-  })
-  functionalUtility('start', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('inset-inline-start', value)],
-  })
-
-  staticUtility('end-auto', [['inset-inline-end', 'auto']])
-  utilities.static('end-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('inset-inline-end', value)]
-  })
-  functionalUtility('end', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('inset-inline-end', value)],
-  })
-
-  staticUtility('top-auto', [['top', 'auto']])
-  utilities.static('top-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('top', value)]
-  })
-  functionalUtility('top', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('top', value)],
-  })
-
-  staticUtility('right-auto', [['right', 'auto']])
-  utilities.static('right-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('right', value)]
-  })
-  functionalUtility('right', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('right', value)],
-  })
-
-  staticUtility('bottom-auto', [['bottom', 'auto']])
-  utilities.static('bottom-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('bottom', value)]
-  })
-  functionalUtility('bottom', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('bottom', value)],
-  })
-
-  staticUtility('left-auto', [['left', 'auto']])
-  utilities.static('left-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
-    return [decl('left', value)]
-  })
-  functionalUtility('left', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--inset', '--spacing'],
-    handle: (value) => [decl('left', value)],
-  })
+  for (let [name, property] of [
+    ['inset', 'inset'],
+    ['inset-x', 'inset-inline'],
+    ['inset-y', 'inset-block'],
+    ['start', 'inset-inline-start'],
+    ['end', 'inset-inline-end'],
+    ['top', 'top'],
+    ['right', 'right'],
+    ['bottom', 'bottom'],
+    ['left', 'left'],
+  ] as const) {
+    staticUtility(`${name}-auto`, [[property, 'auto']])
+    staticUtility(`${name}-full`, [[property, '100%']])
+    staticUtility(`-${name}-full`, [[property, '-100%']])
+    spacingUtility(name, ['--inset', '--spacing'], (value) => [decl(property, value)], {
+      supportsNegative: true,
+      supportsFractions: true,
+    })
+  }
 
   /**
    * @css `isolation`
@@ -588,7 +557,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('z', {
     supportsNegative: true,
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     themeKeys: ['--z-index'],
@@ -612,7 +581,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('order', {
     supportsNegative: true,
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     themeKeys: ['--order'],
@@ -638,7 +607,7 @@ export function createUtilities(theme: Theme) {
   staticUtility('col-span-full', [['grid-column', '1 / -1']])
   functionalUtility('col-span', {
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     handle: (value) => [decl('grid-column', `span ${value} / span ${value}`)],
@@ -651,7 +620,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('col-start', {
     supportsNegative: true,
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     themeKeys: ['--grid-column-start'],
@@ -665,7 +634,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('col-end', {
     supportsNegative: true,
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     themeKeys: ['--grid-column-end'],
@@ -707,7 +676,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('row-span', {
     themeKeys: [],
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     handle: (value) => [decl('grid-row', `span ${value} / span ${value}`)],
@@ -720,7 +689,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('row-start', {
     supportsNegative: true,
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     themeKeys: ['--grid-row-start'],
@@ -734,7 +703,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('row-end', {
     supportsNegative: true,
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     themeKeys: ['--grid-row-end'],
@@ -767,8 +736,8 @@ export function createUtilities(theme: Theme) {
   /**
    * @css `float`
    */
-  staticUtility('float-start', [['float', 'start']])
-  staticUtility('float-end', [['float', 'end']])
+  staticUtility('float-start', [['float', 'inline-start']])
+  staticUtility('float-end', [['float', 'inline-end']])
   staticUtility('float-right', [['float', 'right']])
   staticUtility('float-left', [['float', 'left']])
   staticUtility('float-none', [['float', 'none']])
@@ -776,8 +745,8 @@ export function createUtilities(theme: Theme) {
   /**
    * @css `clear`
    */
-  staticUtility('clear-start', [['clear', 'start']])
-  staticUtility('clear-end', [['clear', 'end']])
+  staticUtility('clear-start', [['clear', 'inline-start']])
+  staticUtility('clear-end', [['clear', 'inline-end']])
   staticUtility('clear-right', [['clear', 'right']])
   staticUtility('clear-left', [['clear', 'left']])
   staticUtility('clear-both', [['clear', 'both']])
@@ -786,28 +755,20 @@ export function createUtilities(theme: Theme) {
   /**
    * @css `margin`
    */
-  for (let [namespace, properties, sort] of [
-    ['m', ['margin']],
-    ['mx', ['margin-left', 'margin-right'], 'margin-inline'],
-    ['my', ['margin-top', 'margin-bottom'], 'margin-block'],
-    ['ms', ['margin-inline-start']],
-    ['me', ['margin-inline-end']],
-    ['mt', ['margin-top']],
-    ['mr', ['margin-right']],
-    ['mb', ['margin-bottom']],
-    ['ml', ['margin-left']],
+  for (let [namespace, property] of [
+    ['m', 'margin'],
+    ['mx', 'margin-inline'],
+    ['my', 'margin-block'],
+    ['ms', 'margin-inline-start'],
+    ['me', 'margin-inline-end'],
+    ['mt', 'margin-top'],
+    ['mr', 'margin-right'],
+    ['mb', 'margin-bottom'],
+    ['ml', 'margin-left'],
   ] as const) {
-    staticUtility(
-      `${namespace}-auto`,
-      properties.map((property) => [property, 'auto']),
-    )
-    functionalUtility(namespace, {
+    staticUtility(`${namespace}-auto`, [[property, 'auto']])
+    spacingUtility(namespace, ['--margin', '--spacing'], (value) => [decl(property, value)], {
       supportsNegative: true,
-      themeKeys: ['--margin', '--spacing'],
-      handle: (value) => [
-        ...(sort ? [decl('--tw-sort', sort)] : []),
-        ...properties.map((property) => decl(property, value)),
-      ],
     })
   }
 
@@ -829,7 +790,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('line-clamp', {
     themeKeys: ['--line-clamp'],
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     handle: (value) => [
@@ -867,23 +828,29 @@ export function createUtilities(theme: Theme) {
   staticUtility('table-row-group', [['display', 'table-row-group']])
   staticUtility('table-row', [['display', 'table-row']])
   staticUtility('flow-root', [['display', 'flow-root']])
+  staticUtility('flex', [['display', 'flex']])
   staticUtility('grid', [['display', 'grid']])
   staticUtility('inline-grid', [['display', 'inline-grid']])
   staticUtility('contents', [['display', 'contents']])
   staticUtility('list-item', [['display', 'list-item']])
 
   /**
+   * @css `field-sizing`
+   */
+  staticUtility('field-sizing-content', [['field-sizing', 'content']])
+  staticUtility('field-sizing-fixed', [['field-sizing', 'fixed']])
+
+  /**
    * @css `aspect-ratio`
    */
   staticUtility('aspect-auto', [['aspect-ratio', 'auto']])
   staticUtility('aspect-square', [['aspect-ratio', '1 / 1']])
-  staticUtility('aspect-video', [['aspect-ratio', '16 / 9']])
   functionalUtility('aspect', {
-    themeKeys: ['--aspect-ratio'],
+    themeKeys: ['--aspect'],
     handleBareValue: ({ fraction }) => {
       if (fraction === null) return null
       let [lhs, rhs] = segment(fraction, '/')
-      if (!Number.isInteger(Number(lhs)) || !Number.isInteger(Number(rhs))) return null
+      if (!isPositiveInteger(lhs) || !isPositiveInteger(rhs)) return null
       return fraction
     },
     handle: (value) => [decl('aspect-ratio', value)],
@@ -892,11 +859,21 @@ export function createUtilities(theme: Theme) {
   /**
    * @css `size`
    * @css `width`
+   * @css `min-width`
+   * @css `max-width`
    * @css `height`
+   * @css `min-height`
+   * @css `max-height`
    */
   for (let [key, value] of [
     ['auto', 'auto'],
     ['full', '100%'],
+    ['svw', '100svw'],
+    ['lvw', '100lvw'],
+    ['dvw', '100dvw'],
+    ['svh', '100svh'],
+    ['lvh', '100lvh'],
+    ['dvh', '100dvh'],
     ['min', 'min-content'],
     ['max', 'max-content'],
     ['fit', 'fit-content'],
@@ -906,131 +883,56 @@ export function createUtilities(theme: Theme) {
       ['width', value],
       ['height', value],
     ])
-  }
-  functionalUtility('size', {
-    supportsFractions: true,
-    themeKeys: ['--size', '--spacing'],
-    handle: (value) => [decl('--tw-sort', 'size'), decl('width', value), decl('height', value)],
-  })
-
-  /**
-   * @css `width`
-   */
-  for (let [key, value] of [
-    ['auto', 'auto'],
-    ['full', '100%'],
-    ['screen', '100vw'],
-    ['svw', '100svw'],
-    ['lvw', '100lvw'],
-    ['dvw', '100dvw'],
-    ['min', 'min-content'],
-    ['max', 'max-content'],
-    ['fit', 'fit-content'],
-  ]) {
     staticUtility(`w-${key}`, [['width', value]])
-  }
-  functionalUtility('w', {
-    supportsFractions: true,
-    themeKeys: ['--width', '--spacing'],
-    handle: (value) => [decl('width', value)],
-  })
-
-  /**
-   * @css `min-width`
-   */
-  for (let [key, value] of [
-    ['auto', 'auto'],
-    ['full', '100%'],
-    ['min', 'min-content'],
-    ['max', 'max-content'],
-    ['fit', 'fit-content'],
-  ]) {
     staticUtility(`min-w-${key}`, [['min-width', value]])
-  }
-  functionalUtility('min-w', {
-    themeKeys: ['--min-width', '--width', '--spacing'],
-    handle: (value) => [decl('min-width', value)],
-  })
-
-  /**
-   * @css `max-width`
-   */
-  for (let [key, value] of [
-    ['none', 'none'],
-    ['full', '100%'],
-    ['min', 'min-content'],
-    ['max', 'max-content'],
-    ['fit', 'fit-content'],
-  ]) {
     staticUtility(`max-w-${key}`, [['max-width', value]])
-  }
-  functionalUtility('max-w', {
-    themeKeys: ['--max-width', '--width', '--spacing'],
-    handle: (value) => [decl('max-width', value)],
-  })
-
-  /**
-   * @css `height`
-   */
-  for (let [key, value] of [
-    ['auto', 'auto'],
-    ['full', '100%'],
-    ['screen', '100vh'],
-    ['svh', '100svh'],
-    ['lvh', '100lvh'],
-    ['dvh', '100dvh'],
-    ['min', 'min-content'],
-    ['max', 'max-content'],
-    ['fit', 'fit-content'],
-  ]) {
     staticUtility(`h-${key}`, [['height', value]])
-  }
-  functionalUtility('h', {
-    supportsFractions: true,
-    themeKeys: ['--height', '--spacing'],
-    handle: (value) => [decl('height', value)],
-  })
-
-  /**
-   * @css `min-height`
-   */
-  for (let [key, value] of [
-    ['auto', 'auto'],
-    ['full', '100%'],
-    ['screen', '100vh'],
-    ['svh', '100svh'],
-    ['lvh', '100lvh'],
-    ['dvh', '100dvh'],
-    ['min', 'min-content'],
-    ['max', 'max-content'],
-    ['fit', 'fit-content'],
-  ]) {
     staticUtility(`min-h-${key}`, [['min-height', value]])
-  }
-  functionalUtility('min-h', {
-    themeKeys: ['--min-height', '--spacing'],
-    handle: (value) => [decl('min-height', value)],
-  })
-
-  /**
-   * @css `max-height`
-   */
-  for (let [key, value] of [
-    ['none', 'none'],
-    ['full', '100%'],
-    ['screen', '100vh'],
-    ['svh', '100svh'],
-    ['lvh', '100lvh'],
-    ['dvh', '100dvh'],
-    ['min', 'min-content'],
-    ['max', 'max-content'],
-    ['fit', 'fit-content'],
-  ]) {
     staticUtility(`max-h-${key}`, [['max-height', value]])
   }
-  functionalUtility('max-h', {
-    themeKeys: ['--max-height', '--spacing'],
-    handle: (value) => [decl('max-height', value)],
+
+  staticUtility(`w-screen`, [['width', '100vw']])
+  staticUtility(`min-w-screen`, [['min-width', '100vw']])
+  staticUtility(`max-w-screen`, [['max-width', '100vw']])
+  staticUtility(`h-screen`, [['height', '100vh']])
+  staticUtility(`min-h-screen`, [['min-height', '100vh']])
+  staticUtility(`max-h-screen`, [['max-height', '100vh']])
+
+  staticUtility(`max-w-none`, [['max-width', 'none']])
+  staticUtility(`max-h-none`, [['max-height', 'none']])
+
+  spacingUtility(
+    'size',
+    ['--size', '--spacing'],
+    (value) => [decl('--tw-sort', 'size'), decl('width', value), decl('height', value)],
+    {
+      supportsFractions: true,
+    },
+  )
+
+  for (let [name, namespaces, property] of [
+    ['w', ['--width', '--spacing', '--container'], 'width'],
+    ['min-w', ['--min-width', '--spacing', '--container'], 'min-width'],
+    ['max-w', ['--max-width', '--spacing', '--container'], 'max-width'],
+    ['h', ['--height', '--spacing'], 'height'],
+    ['min-h', ['--min-height', '--height', '--spacing'], 'min-height'],
+    ['max-h', ['--max-height', '--height', '--spacing'], 'max-height'],
+  ] as [string, ThemeKey[], string][]) {
+    spacingUtility(name, namespaces, (value) => [decl(property, value)], {
+      supportsFractions: true,
+    })
+  }
+
+  utilities.static('container', () => {
+    let breakpoints = [...theme.namespace('--breakpoint').values()]
+    breakpoints.sort((a, z) => compareBreakpoints(a, z, 'asc'))
+
+    let decls: AstNode[] = [decl('--tw-sort', '--tw-container-component'), decl('width', '100%')]
+    for (let breakpoint of breakpoints) {
+      decls.push(atRule('@media', `(width >= ${breakpoint})`, [decl('max-width', breakpoint)]))
+    }
+
+    return decls
   })
 
   /**
@@ -1044,12 +946,7 @@ export function createUtilities(theme: Theme) {
   // generate `flex: 1`. Our `functionalUtility` helper can't handle two properties
   // using the same namespace, so we handle this one manually.
   utilities.functional('flex', (candidate) => {
-    if (candidate.negative) return
-
-    if (!candidate.value) {
-      if (candidate.modifier) return
-      return [decl('display', 'flex')]
-    }
+    if (!candidate.value) return
 
     if (candidate.value.kind === 'arbitrary') {
       if (candidate.modifier) return
@@ -1058,11 +955,11 @@ export function createUtilities(theme: Theme) {
 
     if (candidate.value.fraction) {
       let [lhs, rhs] = segment(candidate.value.fraction, '/')
-      if (!Number.isInteger(Number(lhs)) || !Number.isInteger(Number(rhs))) return
+      if (!isPositiveInteger(lhs) || !isPositiveInteger(rhs)) return
       return [decl('flex', `calc(${candidate.value.fraction} * 100%)`)]
     }
 
-    if (Number.isInteger(Number(candidate.value.value))) {
+    if (isPositiveInteger(candidate.value.value)) {
       if (candidate.modifier) return
       return [decl('flex', candidate.value.value)]
     }
@@ -1074,7 +971,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('shrink', {
     defaultValue: '1',
     handleBareValue: ({ value }) => {
-      if (Number.isNaN(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     handle: (value) => [decl('flex-shrink', value)],
@@ -1086,7 +983,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('grow', {
     defaultValue: '1',
     handleBareValue: ({ value }) => {
-      if (Number.isNaN(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     handle: (value) => [decl('flex-grow', value)],
@@ -1113,11 +1010,14 @@ export function createUtilities(theme: Theme) {
    */
   staticUtility('basis-auto', [['flex-basis', 'auto']])
   staticUtility('basis-full', [['flex-basis', '100%']])
-  functionalUtility('basis', {
-    supportsFractions: true,
-    themeKeys: ['--flex-basis', '--width', '--spacing'],
-    handle: (value) => [decl('flex-basis', value)],
-  })
+  spacingUtility(
+    'basis',
+    ['--flex-basis', '--spacing', '--container'],
+    (value) => [decl('flex-basis', value)],
+    {
+      supportsFractions: true,
+    },
+  )
 
   /**
    * @css `table-layout`
@@ -1146,39 +1046,24 @@ export function createUtilities(theme: Theme) {
   /**
    * @css `border-spacing`
    */
-  functionalUtility('border-spacing', {
-    themeKeys: ['--border-spacing', '--spacing'],
-    handle: (value) => [
-      borderSpacingProperties(),
-      decl('--tw-border-spacing-x', value),
-      decl('--tw-border-spacing-y', value),
-      decl('border-spacing', 'var(--tw-border-spacing-x) var(--tw-border-spacing-y)'),
-    ],
-  })
+  spacingUtility('border-spacing', ['--border-spacing', '--spacing'], (value) => [
+    borderSpacingProperties(),
+    decl('--tw-border-spacing-x', value),
+    decl('--tw-border-spacing-y', value),
+    decl('border-spacing', 'var(--tw-border-spacing-x) var(--tw-border-spacing-y)'),
+  ])
 
-  /**
-   * @css `border-spacing`
-   */
-  functionalUtility('border-spacing-x', {
-    themeKeys: ['--border-spacing', '--spacing'],
-    handle: (value) => [
-      borderSpacingProperties(),
-      decl('--tw-border-spacing-x', value),
-      decl('border-spacing', 'var(--tw-border-spacing-x) var(--tw-border-spacing-y)'),
-    ],
-  })
+  spacingUtility('border-spacing-x', ['--border-spacing', '--spacing'], (value) => [
+    borderSpacingProperties(),
+    decl('--tw-border-spacing-x', value),
+    decl('border-spacing', 'var(--tw-border-spacing-x) var(--tw-border-spacing-y)'),
+  ])
 
-  /**
-   * @css `border-spacing`
-   */
-  functionalUtility('border-spacing-y', {
-    themeKeys: ['--border-spacing', '--spacing'],
-    handle: (value) => [
-      borderSpacingProperties(),
-      decl('--tw-border-spacing-y', value),
-      decl('border-spacing', 'var(--tw-border-spacing-x) var(--tw-border-spacing-y)'),
-    ],
-  })
+  spacingUtility('border-spacing-y', ['--border-spacing', '--spacing'], (value) => [
+    borderSpacingProperties(),
+    decl('--tw-border-spacing-y', value),
+    decl('border-spacing', 'var(--tw-border-spacing-x) var(--tw-border-spacing-y)'),
+  ])
 
   /**
    * @css `transform-origin`
@@ -1222,86 +1107,89 @@ export function createUtilities(theme: Theme) {
 
   let translateProperties = () =>
     atRoot([
-      property('--tw-translate-x', '0', '<length> | <percentage>'),
-      property('--tw-translate-y', '0', '<length> | <percentage>'),
-      property('--tw-translate-z', '0', '<length>'),
+      property('--tw-translate-x', '0'),
+      property('--tw-translate-y', '0'),
+      property('--tw-translate-z', '0'),
     ])
 
   /**
    * @css `translate`
    */
   staticUtility('translate-none', [['translate', 'none']])
-  utilities.static('translate-full', (candidate) => {
-    let value = candidate.negative ? '-100%' : '100%'
+  staticUtility('-translate-full', [
+    translateProperties,
+    ['--tw-translate-x', '-100%'],
+    ['--tw-translate-y', '-100%'],
+    ['translate', 'var(--tw-translate-x) var(--tw-translate-y)'],
+  ])
+  staticUtility('translate-full', [
+    translateProperties,
+    ['--tw-translate-x', '100%'],
+    ['--tw-translate-y', '100%'],
+    ['translate', 'var(--tw-translate-x) var(--tw-translate-y)'],
+  ])
 
-    return [
+  spacingUtility(
+    'translate',
+    ['--translate', '--spacing'],
+    (value) => [
       translateProperties(),
       decl('--tw-translate-x', value),
       decl('--tw-translate-y', value),
-      decl('--tw-translate-z', value),
-      decl('translate', 'var(--tw-translate-x) var(--tw-translate-y)'),
-    ]
-  })
-
-  functionalUtility('translate', {
-    supportsNegative: true,
-    supportsFractions: true,
-    themeKeys: ['--translate', '--spacing'],
-    handle: (value) => [
-      translateProperties(),
-      decl('--tw-translate-x', value),
-      decl('--tw-translate-y', value),
-      decl('--tw-translate-z', value),
       decl('translate', 'var(--tw-translate-x) var(--tw-translate-y)'),
     ],
-  })
+    { supportsNegative: true, supportsFractions: true },
+  )
 
   for (let axis of ['x', 'y']) {
-    let handle = (value: string) => [
-      translateProperties(),
-      decl(`--tw-translate-${axis}`, value),
-      decl('translate', `var(--tw-translate-x) var(--tw-translate-y)`),
-    ]
-
-    /**
-     * @css `translate`
-     */
-    functionalUtility(`translate-${axis}`, {
-      supportsNegative: true,
-      supportsFractions: true,
-      themeKeys: ['--translate', '--spacing'],
-      handle,
-    })
-    utilities.static(`translate-${axis}-px`, (candidate) => {
-      return handle(candidate.negative ? '-1px' : '1px')
-    })
-    utilities.static(`translate-${axis}-full`, (candidate) => {
-      return handle(candidate.negative ? '-100%' : '100%')
-    })
-  }
-  functionalUtility(`translate-z`, {
-    supportsNegative: true,
-    supportsFractions: false,
-    themeKeys: ['--translate', '--spacing'],
-    handle: (value) => {
-      return [
+    staticUtility(`-translate-${axis}-full`, [
+      translateProperties,
+      [`--tw-translate-${axis}`, '-100%'],
+      ['translate', `var(--tw-translate-x) var(--tw-translate-y)`],
+    ])
+    staticUtility(`translate-${axis}-full`, [
+      translateProperties,
+      [`--tw-translate-${axis}`, '100%'],
+      ['translate', `var(--tw-translate-x) var(--tw-translate-y)`],
+    ])
+    spacingUtility(
+      `translate-${axis}`,
+      ['--translate', '--spacing'],
+      (value) => [
         translateProperties(),
-        decl(`--tw-translate-z`, value),
-        decl('translate', 'var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)'),
-      ]
-    },
-  })
-  utilities.static(`translate-z-px`, (candidate) => {
-    return [
-      translateProperties(),
-      decl(`--tw-translate-z`, candidate.negative ? '-1px' : '1px'),
-      decl('translate', 'var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)'),
-    ]
-  })
+        decl(`--tw-translate-${axis}`, value),
+        decl('translate', `var(--tw-translate-x) var(--tw-translate-y)`),
+      ],
+      {
+        supportsNegative: true,
+        supportsFractions: true,
+      },
+    )
+  }
 
-  /**
-   * @css `translate`
-   */
+  spacingUtility(
+    `translate-z`,
+    ['--translate', '--spacing'],
+    (value) => [
+      translateProperties(),
+      decl(`--tw-translate-z`, value),
+      decl('translate', 'var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)'),
+    ],
+    {
+      supportsNegative: true,
+    },
+  )
+  staticUtility(`-translate-z-px`, [
+    translateProperties,
+    [`--tw-translate-z`, '-1px'],
+    ['translate', 'var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)'],
+  ])
+  staticUtility(`translate-z-px`, [
+    translateProperties,
+    [`--tw-translate-z`, '1px'],
+    ['translate', 'var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)'],
+  ])
+
   staticUtility('translate-3d', [
     translateProperties,
     ['translate', 'var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)'],
@@ -1309,38 +1197,42 @@ export function createUtilities(theme: Theme) {
 
   let scaleProperties = () =>
     atRoot([
-      property('--tw-scale-x', '1', '<number> | <percentage>'),
-      property('--tw-scale-y', '1', '<number> | <percentage>'),
-      property('--tw-scale-z', '1', '<number> | <percentage>'),
+      property('--tw-scale-x', '1'),
+      property('--tw-scale-y', '1'),
+      property('--tw-scale-z', '1'),
     ])
 
   /**
    * @css `scale`
    */
   staticUtility('scale-none', [['scale', 'none']])
-  utilities.functional('scale', (candidate) => {
-    if (!candidate.value || candidate.modifier) return
+  function handleScale({ negative }: { negative: boolean }) {
+    return (candidate: Extract<Candidate, { kind: 'functional' }>) => {
+      if (!candidate.value || candidate.modifier) return
 
-    let value
-    if (candidate.value.kind === 'arbitrary') {
-      value = candidate.value.value
-      return [decl('scale', value)]
-    } else {
-      value = theme.resolve(candidate.value.value, ['--scale'])
-      if (!value && !Number.isNaN(Number(candidate.value.value))) {
-        value = `${candidate.value.value}%`
+      let value
+      if (candidate.value.kind === 'arbitrary') {
+        value = candidate.value.value
+        return [decl('scale', value)]
+      } else {
+        value = theme.resolve(candidate.value.value, ['--scale'])
+        if (!value && isPositiveInteger(candidate.value.value)) {
+          value = `${candidate.value.value}%`
+        }
+        if (!value) return
       }
-      if (!value) return
+      value = negative ? `calc(${value} * -1)` : value
+      return [
+        scaleProperties(),
+        decl('--tw-scale-x', value),
+        decl('--tw-scale-y', value),
+        decl('--tw-scale-z', value),
+        decl('scale', `var(--tw-scale-x) var(--tw-scale-y)`),
+      ]
     }
-    value = withNegative(value, candidate)
-    return [
-      scaleProperties(),
-      decl('--tw-scale-x', value),
-      decl('--tw-scale-y', value),
-      decl('--tw-scale-z', value),
-      decl('scale', `var(--tw-scale-x) var(--tw-scale-y)`),
-    ]
-  })
+  }
+  utilities.functional('-scale', handleScale({ negative: true }))
+  utilities.functional('scale', handleScale({ negative: false }))
 
   suggest('scale', () => [
     {
@@ -1358,7 +1250,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--scale'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -1396,28 +1288,33 @@ export function createUtilities(theme: Theme) {
    * `rotate-[1_2_3_45deg]` => `rotate: 1 2 3 45deg`
    */
   staticUtility('rotate-none', [['rotate', 'none']])
-  utilities.functional('rotate', (candidate) => {
-    if (!candidate.value || candidate.modifier) return
 
-    let value
-    if (candidate.value.kind === 'arbitrary') {
-      value = candidate.value.value
-      let type = candidate.value.dataType ?? inferDataType(value, ['angle', 'vector'])
-      if (type === 'vector') {
-        return [decl('rotate', `${value} var(--tw-rotate)`)]
-      } else if (type !== 'angle') {
-        return [decl('rotate', value)]
+  function handleRotate({ negative }: { negative: boolean }) {
+    return (candidate: Extract<Candidate, { kind: 'functional' }>) => {
+      if (!candidate.value || candidate.modifier) return
+
+      let value
+      if (candidate.value.kind === 'arbitrary') {
+        value = candidate.value.value
+        let type = candidate.value.dataType ?? inferDataType(value, ['angle', 'vector'])
+        if (type === 'vector') {
+          return [decl('rotate', `${value} var(--tw-rotate)`)]
+        } else if (type !== 'angle') {
+          return [decl('rotate', value)]
+        }
+      } else {
+        value = theme.resolve(candidate.value.value, ['--rotate'])
+        if (!value && isPositiveInteger(candidate.value.value)) {
+          value = `${candidate.value.value}deg`
+        }
+        if (!value) return
       }
-    } else {
-      value = theme.resolve(candidate.value.value, ['--rotate'])
-      if (!value && !Number.isNaN(Number(candidate.value.value))) {
-        value = `${candidate.value.value}deg`
-      }
-      if (!value) return
+      return [decl('rotate', negative ? `calc(${value} * -1)` : value)]
     }
-    value = withNegative(value, candidate)
-    return [decl('rotate', value)]
-  })
+  }
+
+  utilities.functional('-rotate', handleRotate({ negative: true }))
+  utilities.functional('rotate', handleRotate({ negative: false }))
 
   suggest('rotate', () => [
     {
@@ -1438,11 +1335,11 @@ export function createUtilities(theme: Theme) {
 
     let transformProperties = () =>
       atRoot([
-        property('--tw-rotate-x', 'rotateX(0)', '<transform-function>'),
-        property('--tw-rotate-y', 'rotateY(0)', '<transform-function>'),
-        property('--tw-rotate-z', 'rotateZ(0)', '<transform-function>'),
-        property('--tw-skew-x', 'skewX(0)', '<transform-function>'),
-        property('--tw-skew-y', 'skewY(0)', '<transform-function>'),
+        property('--tw-rotate-x', 'rotateX(0)'),
+        property('--tw-rotate-y', 'rotateY(0)'),
+        property('--tw-rotate-z', 'rotateZ(0)'),
+        property('--tw-skew-x', 'skewX(0)'),
+        property('--tw-skew-y', 'skewY(0)'),
       ])
 
     for (let axis of ['x', 'y', 'z']) {
@@ -1450,12 +1347,12 @@ export function createUtilities(theme: Theme) {
         supportsNegative: true,
         themeKeys: ['--rotate'],
         handleBareValue: ({ value }) => {
-          if (Number.isNaN(Number(value))) return null
-          return `rotate${axis.toUpperCase()}(${value}deg)`
+          if (!isPositiveInteger(value)) return null
+          return `${value}deg`
         },
         handle: (value) => [
           transformProperties(),
-          decl(`--tw-rotate-${axis}`, value),
+          decl(`--tw-rotate-${axis}`, `rotate${axis.toUpperCase()}(${value})`),
           decl('transform', transformValue),
         ],
       })
@@ -1477,7 +1374,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--skew'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}deg`
       },
       handle: (value) => [
@@ -1496,7 +1393,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--skew'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}deg`
       },
       handle: (value) => [
@@ -1514,7 +1411,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--skew'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}deg`
       },
       handle: (value) => [
@@ -1552,7 +1449,7 @@ export function createUtilities(theme: Theme) {
      * @css `transform`
      */
     utilities.functional('transform', (candidate) => {
-      if (candidate.negative || candidate.modifier) return
+      if (candidate.modifier) return
 
       let value: string | null = null
       if (!candidate.value) {
@@ -1722,114 +1619,46 @@ export function createUtilities(theme: Theme) {
   staticUtility('snap-normal', [['scroll-snap-stop', 'normal']])
   staticUtility('snap-always', [['scroll-snap-stop', 'always']])
 
-  functionalUtility('scroll-m', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin', value)],
-  })
+  /**
+   * @css `scroll-margin`
+   */
+  for (let [namespace, property] of [
+    ['scroll-m', 'scroll-margin'],
+    ['scroll-mx', 'scroll-margin-inline'],
+    ['scroll-my', 'scroll-margin-block'],
+    ['scroll-ms', 'scroll-margin-inline-start'],
+    ['scroll-me', 'scroll-margin-inline-end'],
+    ['scroll-mt', 'scroll-margin-top'],
+    ['scroll-mr', 'scroll-margin-right'],
+    ['scroll-mb', 'scroll-margin-bottom'],
+    ['scroll-ml', 'scroll-margin-left'],
+  ] as const) {
+    spacingUtility(
+      namespace,
+      ['--scroll-margin', '--spacing'],
+      (value) => [decl(property, value)],
+      {
+        supportsNegative: true,
+      },
+    )
+  }
 
-  functionalUtility('scroll-mx', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-left', value), decl('scroll-margin-right', value)],
-  })
-
-  functionalUtility('scroll-my', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-top', value), decl('scroll-margin-bottom', value)],
-  })
-
-  functionalUtility('scroll-ms', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-inline-start', value)],
-  })
-
-  functionalUtility('scroll-me', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-inline-end', value)],
-  })
-
-  functionalUtility('scroll-mt', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-top', value)],
-  })
-
-  functionalUtility('scroll-mr', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-right', value)],
-  })
-
-  functionalUtility('scroll-mb', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-bottom', value)],
-  })
-
-  functionalUtility('scroll-ml', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-margin', '--spacing'],
-    handle: (value) => [decl('scroll-margin-left', value)],
-  })
-
-  // scroll-padding
-  functionalUtility('scroll-p', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding', value)],
-  })
-
-  functionalUtility('scroll-px', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-left', value), decl('scroll-padding-right', value)],
-  })
-
-  functionalUtility('scroll-py', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-top', value), decl('scroll-padding-bottom', value)],
-  })
-
-  functionalUtility('scroll-ps', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-inline-start', value)],
-  })
-
-  functionalUtility('scroll-pe', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-inline-end', value)],
-  })
-
-  functionalUtility('scroll-pt', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-top', value)],
-  })
-
-  functionalUtility('scroll-pr', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-right', value)],
-  })
-
-  functionalUtility('scroll-pb', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-bottom', value)],
-  })
-
-  functionalUtility('scroll-pl', {
-    supportsNegative: true,
-    themeKeys: ['--scroll-padding', '--spacing'],
-    handle: (value) => [decl('scroll-padding-left', value)],
-  })
+  /**
+   * @css `scroll-padding`
+   */
+  for (let [namespace, property] of [
+    ['scroll-p', 'scroll-padding'],
+    ['scroll-px', 'scroll-padding-inline'],
+    ['scroll-py', 'scroll-padding-block'],
+    ['scroll-ps', 'scroll-padding-inline-start'],
+    ['scroll-pe', 'scroll-padding-inline-end'],
+    ['scroll-pt', 'scroll-padding-top'],
+    ['scroll-pr', 'scroll-padding-right'],
+    ['scroll-pb', 'scroll-padding-bottom'],
+    ['scroll-pl', 'scroll-padding-left'],
+  ] as const) {
+    spacingUtility(namespace, ['--scroll-padding', '--spacing'], (value) => [decl(property, value)])
+  }
 
   staticUtility('list-inside', [['list-style-position', 'inside']])
   staticUtility('list-outside', [['list-style-position', 'outside']])
@@ -1856,13 +1685,20 @@ export function createUtilities(theme: Theme) {
   staticUtility('appearance-none', [['appearance', 'none']])
   staticUtility('appearance-auto', [['appearance', 'auto']])
 
+  staticUtility('scheme-normal', [['color-scheme', 'normal']])
+  staticUtility('scheme-dark', [['color-scheme', 'dark']])
+  staticUtility('scheme-light', [['color-scheme', 'light']])
+  staticUtility('scheme-light-dark', [['color-scheme', 'light dark']])
+  staticUtility('scheme-only-dark', [['color-scheme', 'only dark']])
+  staticUtility('scheme-only-light', [['color-scheme', 'only light']])
+
   // columns-*
   staticUtility('columns-auto', [['columns', 'auto']])
 
   functionalUtility('columns', {
-    themeKeys: ['--columns', '--width'],
+    themeKeys: ['--columns', '--container'],
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return value
     },
     handle: (value) => [decl('columns', value)],
@@ -1871,7 +1707,7 @@ export function createUtilities(theme: Theme) {
   suggest('columns', () => [
     {
       values: Array.from({ length: 12 }, (_, i) => `${i + 1}`),
-      valueThemeKeys: ['--columns', '--width'],
+      valueThemeKeys: ['--columns', '--container'],
     },
   ])
 
@@ -1916,7 +1752,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('grid-cols', {
     themeKeys: ['--grid-template-columns'],
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return `repeat(${value}, minmax(0, 1fr))`
     },
     handle: (value) => [decl('grid-template-columns', value)],
@@ -1927,7 +1763,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('grid-rows', {
     themeKeys: ['--grid-template-rows'],
     handleBareValue: ({ value }) => {
-      if (!Number.isInteger(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return `repeat(${value}, minmax(0, 1fr))`
     },
     handle: (value) => [decl('grid-template-rows', value)],
@@ -1959,9 +1795,9 @@ export function createUtilities(theme: Theme) {
   staticUtility('place-content-center', [['place-content', 'center']])
   staticUtility('place-content-start', [['place-content', 'start']])
   staticUtility('place-content-end', [['place-content', 'end']])
-  staticUtility('place-content-between', [['place-content', 'between']])
-  staticUtility('place-content-around', [['place-content', 'around']])
-  staticUtility('place-content-evenly', [['place-content', 'evenly']])
+  staticUtility('place-content-between', [['place-content', 'space-between']])
+  staticUtility('place-content-around', [['place-content', 'space-around']])
+  staticUtility('place-content-evenly', [['place-content', 'space-evenly']])
   staticUtility('place-content-baseline', [['place-content', 'baseline']])
   staticUtility('place-content-stretch', [['place-content', 'stretch']])
 
@@ -2003,62 +1839,54 @@ export function createUtilities(theme: Theme) {
   staticUtility('justify-items-end', [['justify-items', 'end']])
   staticUtility('justify-items-stretch', [['justify-items', 'stretch']])
 
-  functionalUtility('gap', {
-    themeKeys: ['--gap', '--spacing'],
-    handle: (value) => [decl('gap', value)],
-  })
+  spacingUtility('gap', ['--gap', '--spacing'], (value) => [decl('gap', value)])
+  spacingUtility('gap-x', ['--gap', '--spacing'], (value) => [decl('column-gap', value)])
+  spacingUtility('gap-y', ['--gap', '--spacing'], (value) => [decl('row-gap', value)])
 
-  functionalUtility('gap-x', {
-    themeKeys: ['--gap', '--spacing'],
-    handle: (value) => [decl('column-gap', value)],
-  })
+  spacingUtility(
+    'space-x',
+    ['--space', '--spacing'],
+    (value) => [
+      atRoot([property('--tw-space-x-reverse', '0')]),
 
-  functionalUtility('gap-y', {
-    themeKeys: ['--gap', '--spacing'],
-    handle: (value) => [decl('row-gap', value)],
-  })
-
-  functionalUtility('space-x', {
-    supportsNegative: true,
-    themeKeys: ['--space', '--spacing'],
-    handle: (value) => [
-      atRoot([property('--tw-space-x-reverse', '0', '<number>')]),
-
-      rule(':where(& > :not(:last-child))', [
+      styleRule(':where(& > :not(:last-child))', [
         decl('--tw-sort', 'row-gap'),
+        decl('--tw-space-x-reverse', '0'),
         decl('margin-inline-start', `calc(${value} * var(--tw-space-x-reverse))`),
         decl('margin-inline-end', `calc(${value} * calc(1 - var(--tw-space-x-reverse)))`),
       ]),
     ],
-  })
+    { supportsNegative: true },
+  )
 
-  functionalUtility('space-y', {
-    supportsNegative: true,
-    themeKeys: ['--space', '--spacing'],
-    handle: (value) => [
-      atRoot([property('--tw-space-y-reverse', '0', '<number>')]),
-
-      rule(':where(& > :not(:last-child))', [
+  spacingUtility(
+    'space-y',
+    ['--space', '--spacing'],
+    (value) => [
+      atRoot([property('--tw-space-y-reverse', '0')]),
+      styleRule(':where(& > :not(:last-child))', [
         decl('--tw-sort', 'column-gap'),
-        decl('margin-top', `calc(${value} * var(--tw-space-y-reverse))`),
-        decl('margin-bottom', `calc(${value} * calc(1 - var(--tw-space-y-reverse)))`),
+        decl('--tw-space-y-reverse', '0'),
+        decl('margin-block-start', `calc(${value} * var(--tw-space-y-reverse))`),
+        decl('margin-block-end', `calc(${value} * calc(1 - var(--tw-space-y-reverse)))`),
       ]),
     ],
-  })
+    { supportsNegative: true },
+  )
 
   staticUtility('space-x-reverse', [
-    () => atRoot([property('--tw-space-x-reverse', '0', '<number>')]),
+    () => atRoot([property('--tw-space-x-reverse', '0')]),
     () =>
-      rule(':where(& > :not(:last-child))', [
+      styleRule(':where(& > :not(:last-child))', [
         decl('--tw-sort', 'row-gap'),
         decl('--tw-space-x-reverse', '1'),
       ]),
   ])
 
   staticUtility('space-y-reverse', [
-    () => atRoot([property('--tw-space-y-reverse', '0', '<number>')]),
+    () => atRoot([property('--tw-space-y-reverse', '0')]),
     () =>
-      rule(':where(& > :not(:last-child))', [
+      styleRule(':where(& > :not(:last-child))', [
         decl('--tw-sort', 'column-gap'),
         decl('--tw-space-y-reverse', '1'),
       ]),
@@ -2078,7 +1906,7 @@ export function createUtilities(theme: Theme) {
   colorUtility('divide', {
     themeKeys: ['--divide-color', '--color'],
     handle: (value) => [
-      rule(':where(& > :not(:last-child))', [
+      styleRule(':where(& > :not(:last-child))', [
         decl('--tw-sort', 'divide-color'),
         decl('border-color', value),
       ]),
@@ -2158,7 +1986,7 @@ export function createUtilities(theme: Theme) {
   ])
   staticUtility('break-words', [['overflow-wrap', 'break-word']])
   staticUtility('break-all', [['word-break', 'break-all']])
-  staticUtility('break-keep', [['word-break', 'break-keep']])
+  staticUtility('break-keep', [['word-break', 'keep-all']])
 
   {
     // border-radius
@@ -2227,13 +2055,11 @@ export function createUtilities(theme: Theme) {
     }
 
     let borderProperties = () => {
-      return atRoot([property('--tw-border-style', 'solid', '<custom-ident>')])
+      return atRoot([property('--tw-border-style', 'solid')])
     }
 
     function borderSideUtility(classRoot: string, desc: BorderDescription) {
       utilities.functional(classRoot, (candidate) => {
-        if (candidate.negative) return
-
         if (!candidate.value) {
           if (candidate.modifier) return
           let value = theme.get(['--default-border-width']) ?? '1px'
@@ -2282,7 +2108,7 @@ export function createUtilities(theme: Theme) {
             return [borderProperties(), ...decls]
           }
 
-          if (!Number.isNaN(Number(candidate.value.value))) {
+          if (isPositiveInteger(candidate.value.value)) {
             let decls = desc.width(`${candidate.value.value}px`)
             if (!decls) return
             return [borderProperties(), ...decls]
@@ -2295,11 +2121,10 @@ export function createUtilities(theme: Theme) {
           values: ['current', 'inherit', 'transparent'],
           valueThemeKeys: ['--border-color', '--color'],
           modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-          modifierThemeKeys: ['--opacity'],
           hasDefaultValue: true,
         },
         {
-          values: [],
+          values: ['0', '2', '4', '8'],
           valueThemeKeys: ['--border-width'],
         },
       ])
@@ -2315,22 +2140,18 @@ export function createUtilities(theme: Theme) {
 
     borderSideUtility('border-x', {
       width: (value) => [
-        decl('border-left-style', 'var(--tw-border-style)'),
-        decl('border-right-style', 'var(--tw-border-style)'),
-        decl('border-left-width', value),
-        decl('border-right-width', value),
+        decl('border-inline-style', 'var(--tw-border-style)'),
+        decl('border-inline-width', value),
       ],
-      color: (value) => [decl('border-left-color', value), decl('border-right-color', value)],
+      color: (value) => [decl('border-inline-color', value)],
     })
 
     borderSideUtility('border-y', {
       width: (value) => [
-        decl('border-top-style', 'var(--tw-border-style)'),
-        decl('border-bottom-style', 'var(--tw-border-style)'),
-        decl('border-top-width', value),
-        decl('border-bottom-width', value),
+        decl('border-block-style', 'var(--tw-border-style)'),
+        decl('border-block-width', value),
       ],
-      color: (value) => [decl('border-top-color', value), decl('border-bottom-color', value)],
+      color: (value) => [decl('border-block-color', value)],
     })
 
     borderSideUtility('border-s', {
@@ -2385,15 +2206,16 @@ export function createUtilities(theme: Theme) {
       defaultValue: theme.get(['--default-border-width']) ?? '1px',
       themeKeys: ['--divide-width', '--border-width'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}px`
       },
       handle: (value) => [
-        atRoot([property('--tw-divide-x-reverse', '0', '<number>')]),
+        atRoot([property('--tw-divide-x-reverse', '0')]),
 
-        rule(':where(& > :not(:last-child))', [
+        styleRule(':where(& > :not(:last-child))', [
           decl('--tw-sort', 'divide-x-width'),
           borderProperties(),
+          decl('--tw-divide-x-reverse', '0'),
           decl('border-inline-style', 'var(--tw-border-style)'),
           decl('border-inline-start-width', `calc(${value} * var(--tw-divide-x-reverse))`),
           decl('border-inline-end-width', `calc(${value} * calc(1 - var(--tw-divide-x-reverse)))`),
@@ -2405,15 +2227,16 @@ export function createUtilities(theme: Theme) {
       defaultValue: theme.get(['--default-border-width']) ?? '1px',
       themeKeys: ['--divide-width', '--border-width'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}px`
       },
       handle: (value) => [
-        atRoot([property('--tw-divide-y-reverse', '0', '<number>')]),
+        atRoot([property('--tw-divide-y-reverse', '0')]),
 
-        rule(':where(& > :not(:last-child))', [
+        styleRule(':where(& > :not(:last-child))', [
           decl('--tw-sort', 'divide-y-width'),
           borderProperties(),
+          decl('--tw-divide-y-reverse', '0'),
           decl('border-bottom-style', 'var(--tw-border-style)'),
           decl('border-top-style', 'var(--tw-border-style)'),
           decl('border-top-width', `calc(${value} * var(--tw-divide-y-reverse))`),
@@ -2439,19 +2262,19 @@ export function createUtilities(theme: Theme) {
     ])
 
     staticUtility('divide-x-reverse', [
-      () => atRoot([property('--tw-divide-x-reverse', '0', '<number>')]),
-      () => rule(':where(& > :not(:last-child))', [decl('--tw-divide-x-reverse', '1')]),
+      () => atRoot([property('--tw-divide-x-reverse', '0')]),
+      () => styleRule(':where(& > :not(:last-child))', [decl('--tw-divide-x-reverse', '1')]),
     ])
 
     staticUtility('divide-y-reverse', [
-      () => atRoot([property('--tw-divide-y-reverse', '0', '<number>')]),
-      () => rule(':where(& > :not(:last-child))', [decl('--tw-divide-y-reverse', '1')]),
+      () => atRoot([property('--tw-divide-y-reverse', '0')]),
+      () => styleRule(':where(& > :not(:last-child))', [decl('--tw-divide-y-reverse', '1')]),
     ])
 
     for (let value of ['solid', 'dashed', 'dotted', 'double', 'none']) {
       staticUtility(`divide-${value}`, [
         () =>
-          rule(':where(& > :not(:last-child))', [
+          styleRule(':where(& > :not(:last-child))', [
             decl('--tw-sort', 'divide-style'),
             decl('--tw-border-style', value),
             decl('border-style', value),
@@ -2459,9 +2282,6 @@ export function createUtilities(theme: Theme) {
       ])
     }
   }
-
-  staticUtility('bg-inherit', [['background-color', 'inherit']])
-  staticUtility('bg-transparent', [['background-color', 'transparent']])
 
   staticUtility('bg-auto', [['background-size', 'auto']])
   staticUtility('bg-cover', [['background-size', 'cover']])
@@ -2485,54 +2305,196 @@ export function createUtilities(theme: Theme) {
   staticUtility('bg-no-repeat', [['background-repeat', 'no-repeat']])
   staticUtility('bg-repeat-x', [['background-repeat', 'repeat-x']])
   staticUtility('bg-repeat-y', [['background-repeat', 'repeat-y']])
-  staticUtility('bg-round', [['background-repeat', 'round']])
-  staticUtility('bg-space', [['background-repeat', 'space']])
+  staticUtility('bg-repeat-round', [['background-repeat', 'round']])
+  staticUtility('bg-repeat-space', [['background-repeat', 'space']])
 
   staticUtility('bg-none', [['background-image', 'none']])
 
-  for (let [value, direction] of [
-    ['t', 'top'],
-    ['tr', 'top right'],
-    ['r', 'right'],
-    ['br', 'bottom right'],
-    ['b', 'bottom'],
-    ['bl', 'bottom left'],
-    ['l', 'left'],
-    ['tl', 'top left'],
-  ]) {
-    staticUtility(`bg-gradient-to-${value}`, [
-      ['background-image', `linear-gradient(to ${direction}, var(--tw-gradient-stops,))`],
+  {
+    let suggestedModifiers = [
+      'oklab',
+      'oklch',
+      'srgb',
+      'hsl',
+      'longer',
+      'shorter',
+      'increasing',
+      'decreasing',
+    ]
+
+    let linearGradientDirections = new Map([
+      ['to-t', 'to top'],
+      ['to-tr', 'to top right'],
+      ['to-r', 'to right'],
+      ['to-br', 'to bottom right'],
+      ['to-b', 'to bottom'],
+      ['to-bl', 'to bottom left'],
+      ['to-l', 'to left'],
+      ['to-tl', 'to top left'],
     ])
 
-    staticUtility(`bg-linear-to-${value}`, [
-      ['background-image', `linear-gradient(to ${direction}, var(--tw-gradient-stops,))`],
+    function resolveInterpolationModifier(modifier: CandidateModifier | null) {
+      let interpolationMethod = 'in oklab'
+
+      if (modifier?.kind === 'named') {
+        switch (modifier.value) {
+          case 'longer':
+          case 'shorter':
+          case 'increasing':
+          case 'decreasing':
+            interpolationMethod = `in oklch ${modifier.value} hue`
+            break
+          default:
+            interpolationMethod = `in ${modifier.value}`
+        }
+      } else if (modifier?.kind === 'arbitrary') {
+        interpolationMethod = modifier.value
+      }
+
+      return interpolationMethod
+    }
+
+    function handleBgLinear({ negative }: { negative: boolean }) {
+      return (candidate: Extract<Candidate, { kind: 'functional' }>) => {
+        if (!candidate.value) return
+
+        if (candidate.value.kind === 'arbitrary') {
+          if (candidate.modifier) return
+
+          let value = candidate.value.value
+          let type = candidate.value.dataType ?? inferDataType(value, ['angle'])
+
+          switch (type) {
+            case 'angle': {
+              value = negative ? `calc(${value} * -1)` : `${value}`
+
+              return [
+                decl('--tw-gradient-position', `${value},`),
+                decl('background-image', `linear-gradient(var(--tw-gradient-stops,${value}))`),
+              ]
+            }
+            default: {
+              if (negative) return
+
+              return [
+                decl('--tw-gradient-position', `${value},`),
+                decl('background-image', `linear-gradient(var(--tw-gradient-stops,${value}))`),
+              ]
+            }
+          }
+        }
+
+        let value = candidate.value.value
+
+        if (!negative && linearGradientDirections.has(value)) {
+          value = linearGradientDirections.get(value)!
+        } else if (isPositiveInteger(value)) {
+          value = negative ? `calc(${value}deg * -1)` : `${value}deg`
+        } else {
+          return
+        }
+
+        let interpolationMethod = resolveInterpolationModifier(candidate.modifier)
+
+        return [
+          decl('--tw-gradient-position', `${value} ${interpolationMethod},`),
+          decl('background-image', `linear-gradient(var(--tw-gradient-stops))`),
+        ]
+      }
+    }
+
+    utilities.functional('-bg-linear', handleBgLinear({ negative: true }))
+    utilities.functional('bg-linear', handleBgLinear({ negative: false }))
+
+    suggest('bg-linear', () => [
+      {
+        values: [...linearGradientDirections.keys()],
+        modifiers: suggestedModifiers,
+      },
+      {
+        values: ['0', '30', '60', '90', '120', '150', '180', '210', '240', '270', '300', '330'],
+        supportsNegative: true,
+        modifiers: suggestedModifiers,
+      },
+    ])
+
+    function handleBgConic({ negative }: { negative: boolean }) {
+      return (candidate: Extract<Candidate, { kind: 'functional' }>) => {
+        if (candidate.value?.kind === 'arbitrary') {
+          if (candidate.modifier) return
+          let value = candidate.value.value
+          return [
+            decl('--tw-gradient-position', `${value},`),
+            decl('background-image', `conic-gradient(var(--tw-gradient-stops,${value}))`),
+          ]
+        }
+
+        let interpolationMethod = resolveInterpolationModifier(candidate.modifier)
+
+        if (!candidate.value) {
+          return [
+            decl('--tw-gradient-position', `${interpolationMethod},`),
+            decl('background-image', `conic-gradient(var(--tw-gradient-stops))`),
+          ]
+        }
+
+        let value = candidate.value.value
+
+        if (!isPositiveInteger(value)) return
+
+        value = negative ? `calc(${value} * -1)` : `${value}deg`
+
+        return [
+          decl('--tw-gradient-position', `from ${value} ${interpolationMethod},`),
+          decl('background-image', `conic-gradient(var(--tw-gradient-stops))`),
+        ]
+      }
+    }
+
+    utilities.functional('-bg-conic', handleBgConic({ negative: true }))
+    utilities.functional('bg-conic', handleBgConic({ negative: false }))
+
+    suggest('bg-conic', () => [
+      {
+        hasDefaultValue: true,
+        modifiers: suggestedModifiers,
+      },
+      {
+        values: ['0', '30', '60', '90', '120', '150', '180', '210', '240', '270', '300', '330'],
+        supportsNegative: true,
+        modifiers: suggestedModifiers,
+      },
+    ])
+
+    utilities.functional('bg-radial', (candidate) => {
+      if (!candidate.value) {
+        let interpolationMethod = resolveInterpolationModifier(candidate.modifier)
+        return [
+          decl('--tw-gradient-position', `${interpolationMethod},`),
+          decl('background-image', `radial-gradient(var(--tw-gradient-stops))`),
+        ]
+      }
+
+      if (candidate.value.kind === 'arbitrary') {
+        if (candidate.modifier) return
+        let value = candidate.value.value
+        return [
+          decl('--tw-gradient-position', `${value},`),
+          decl('background-image', `radial-gradient(var(--tw-gradient-stops,${value}))`),
+        ]
+      }
+    })
+
+    suggest('bg-radial', () => [
+      {
+        hasDefaultValue: true,
+        modifiers: suggestedModifiers,
+      },
     ])
   }
 
-  utilities.functional('bg-linear', (candidate) => {
-    if (!candidate.value || candidate.modifier) return
-
-    if (candidate.value.kind === 'arbitrary') {
-      let value: string | null = candidate.value.value
-      let type = candidate.value.dataType ?? inferDataType(value, ['angle'])
-
-      switch (type) {
-        case 'angle': {
-          value = withNegative(value, candidate)
-
-          return [decl('background-image', `linear-gradient(${value}, var(--tw-gradient-stops,))`)]
-        }
-        default: {
-          if (candidate.negative) return
-
-          return [decl('background-image', `linear-gradient(${value}, var(--tw-gradient-stops,))`)]
-        }
-      }
-    }
-  })
-
   utilities.functional('bg', (candidate) => {
-    if (candidate.negative || !candidate.value) return
+    if (!candidate.value) return
 
     // Arbitrary values
     if (candidate.value.kind === 'arbitrary') {
@@ -2598,7 +2560,6 @@ export function createUtilities(theme: Theme) {
       values: ['current', 'inherit', 'transparent'],
       valueThemeKeys: ['--background-color', '--color'],
       modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-      modifierThemeKeys: ['--opacity'],
     },
     {
       values: [],
@@ -2608,16 +2569,15 @@ export function createUtilities(theme: Theme) {
 
   let gradientStopProperties = () => {
     return atRoot([
+      property('--tw-gradient-position'),
       property('--tw-gradient-from', '#0000', '<color>'),
+      property('--tw-gradient-via', '#0000', '<color>'),
       property('--tw-gradient-to', '#0000', '<color>'),
-      property('--tw-gradient-from', 'transparent', '<color>'),
-      property('--tw-gradient-via', 'transparent', '<color>'),
-      property('--tw-gradient-to', 'transparent', '<color>'),
       property('--tw-gradient-stops'),
       property('--tw-gradient-via-stops'),
-      property('--tw-gradient-from-position', '0%', '<length> | <percentage>'),
-      property('--tw-gradient-via-position', '50%', '<length> | <percentage>'),
-      property('--tw-gradient-to-position', '100%', '<length> | <percentage>'),
+      property('--tw-gradient-from-position', '0%', '<length-percentage>'),
+      property('--tw-gradient-via-position', '50%', '<length-percentage>'),
+      property('--tw-gradient-to-position', '100%', '<length-percentage>'),
     ])
   }
 
@@ -2628,7 +2588,7 @@ export function createUtilities(theme: Theme) {
 
   function gradientStopUtility(classRoot: string, desc: GradientStopDescription) {
     utilities.functional(classRoot, (candidate) => {
-      if (candidate.negative || !candidate.value) return
+      if (!candidate.value) return
 
       // Arbitrary values
       if (candidate.value.kind === 'arbitrary') {
@@ -2667,7 +2627,7 @@ export function createUtilities(theme: Theme) {
           return desc.position(value)
         } else if (
           candidate.value.value[candidate.value.value.length - 1] === '%' &&
-          !Number.isNaN(Number(candidate.value.value.slice(0, -1)))
+          isPositiveInteger(candidate.value.value.slice(0, -1))
         ) {
           return desc.position(candidate.value.value)
         }
@@ -2679,7 +2639,6 @@ export function createUtilities(theme: Theme) {
         values: ['current', 'inherit', 'transparent'],
         valueThemeKeys: ['--background-color', '--color'],
         modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
       },
       {
         values: Array.from({ length: 21 }, (_, index) => `${index * 5}%`),
@@ -2695,7 +2654,7 @@ export function createUtilities(theme: Theme) {
       decl('--tw-gradient-from', value),
       decl(
         '--tw-gradient-stops',
-        'var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))',
+        'var(--tw-gradient-via-stops, var(--tw-gradient-position,) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))',
       ),
     ],
     position: (value) => [gradientStopProperties(), decl('--tw-gradient-from-position', value)],
@@ -2708,7 +2667,7 @@ export function createUtilities(theme: Theme) {
       decl('--tw-gradient-via', value),
       decl(
         '--tw-gradient-via-stops',
-        'var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position)',
+        'var(--tw-gradient-position,) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position)',
       ),
       decl('--tw-gradient-stops', 'var(--tw-gradient-via-stops)'),
     ],
@@ -2721,7 +2680,7 @@ export function createUtilities(theme: Theme) {
       decl('--tw-gradient-to', value),
       decl(
         '--tw-gradient-stops',
-        'var(--tw-gradient-via-stops, var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))',
+        'var(--tw-gradient-via-stops, var(--tw-gradient-position,) var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position))',
       ),
     ],
     position: (value) => [gradientStopProperties(), decl('--tw-gradient-to-position', value)],
@@ -2778,7 +2737,7 @@ export function createUtilities(theme: Theme) {
 
   staticUtility('fill-none', [['fill', 'none']])
   utilities.functional('fill', (candidate) => {
-    if (candidate.negative || !candidate.value) return
+    if (!candidate.value) return
 
     if (candidate.value.kind === 'arbitrary') {
       let value = asColor(candidate.value.value, candidate.modifier, theme)
@@ -2797,13 +2756,12 @@ export function createUtilities(theme: Theme) {
       values: ['current', 'inherit', 'transparent'],
       valueThemeKeys: ['--fill', '--color'],
       modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-      modifierThemeKeys: ['--opacity'],
     },
   ])
 
   staticUtility('stroke-none', [['stroke', 'none']])
   utilities.functional('stroke', (candidate) => {
-    if (candidate.negative || !candidate.value) return
+    if (!candidate.value) return
 
     if (candidate.value.kind === 'arbitrary') {
       let value: string | null = candidate.value.value
@@ -2838,7 +2796,7 @@ export function createUtilities(theme: Theme) {
       let value = theme.resolve(candidate.value.value, ['--stroke-width'])
       if (value) {
         return [decl('stroke-width', value)]
-      } else if (!Number.isNaN(Number(candidate.value.value))) {
+      } else if (isPositiveInteger(candidate.value.value)) {
         return [decl('stroke-width', candidate.value.value)]
       }
     }
@@ -2849,7 +2807,6 @@ export function createUtilities(theme: Theme) {
       values: ['current', 'inherit', 'transparent'],
       valueThemeKeys: ['--stroke', '--color'],
       modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-      modifierThemeKeys: ['--opacity'],
     },
     {
       values: ['0', '1', '2', '3'],
@@ -2877,45 +2834,19 @@ export function createUtilities(theme: Theme) {
     handle: (value) => [decl('object-position', value)],
   })
 
-  functionalUtility('p', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding', value)],
-  })
-
-  functionalUtility('px', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-left', value), decl('padding-right', value)],
-  })
-
-  functionalUtility('py', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-top', value), decl('padding-bottom', value)],
-  })
-
-  functionalUtility('pt', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-top', value)],
-  })
-  functionalUtility('ps', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-inline-start', value)],
-  })
-  functionalUtility('pe', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-inline-end', value)],
-  })
-  functionalUtility('pr', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-right', value)],
-  })
-  functionalUtility('pb', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-bottom', value)],
-  })
-  functionalUtility('pl', {
-    themeKeys: ['--padding', '--spacing'],
-    handle: (value) => [decl('padding-left', value)],
-  })
+  for (let [name, property] of [
+    ['p', 'padding'],
+    ['px', 'padding-inline'],
+    ['py', 'padding-block'],
+    ['ps', 'padding-inline-start'],
+    ['pe', 'padding-inline-end'],
+    ['pt', 'padding-top'],
+    ['pr', 'padding-right'],
+    ['pb', 'padding-bottom'],
+    ['pl', 'padding-left'],
+  ] as const) {
+    spacingUtility(name, ['--padding', '--spacing'], (value) => [decl(property, value)])
+  }
 
   staticUtility('text-left', [['text-align', 'left']])
   staticUtility('text-center', [['text-align', 'center']])
@@ -2924,11 +2855,14 @@ export function createUtilities(theme: Theme) {
   staticUtility('text-start', [['text-align', 'start']])
   staticUtility('text-end', [['text-align', 'end']])
 
-  functionalUtility('indent', {
-    supportsNegative: true,
-    themeKeys: ['--text-indent', '--spacing'],
-    handle: (value) => [decl('text-indent', value)],
-  })
+  spacingUtility(
+    'indent',
+    ['--text-indent', '--spacing'],
+    (value) => [decl('text-indent', value)],
+    {
+      supportsNegative: true,
+    },
+  )
 
   staticUtility('align-baseline', [['vertical-align', 'baseline']])
   staticUtility('align-top', [['vertical-align', 'top']])
@@ -2945,7 +2879,7 @@ export function createUtilities(theme: Theme) {
   })
 
   utilities.functional('font', (candidate) => {
-    if (candidate.negative || !candidate.value || candidate.modifier) return
+    if (!candidate.value || candidate.modifier) return
 
     if (candidate.value.kind === 'arbitrary') {
       let value = candidate.value.value
@@ -2958,7 +2892,11 @@ export function createUtilities(theme: Theme) {
           return [decl('font-family', value)]
         }
         default: {
-          return [decl('font-weight', value)]
+          return [
+            atRoot([property('--tw-font-weight')]),
+            decl('--tw-font-weight', value),
+            decl('font-weight', value),
+          ]
         }
       }
     }
@@ -2966,7 +2904,7 @@ export function createUtilities(theme: Theme) {
     {
       let value = theme.resolveWith(
         candidate.value.value,
-        ['--font-family'],
+        ['--font'],
         ['--font-feature-settings', '--font-variation-settings'],
       )
       if (value) {
@@ -2983,41 +2921,11 @@ export function createUtilities(theme: Theme) {
     {
       let value = theme.resolve(candidate.value.value, ['--font-weight'])
       if (value) {
-        return [decl('font-weight', value)]
-      }
-
-      switch (candidate.value.value) {
-        case 'thin':
-          value = '100'
-          break
-        case 'extralight':
-          value = '200'
-          break
-        case 'light':
-          value = '300'
-          break
-        case 'normal':
-          value = '400'
-          break
-        case 'medium':
-          value = '500'
-          break
-        case 'semibold':
-          value = '600'
-          break
-        case 'bold':
-          value = '700'
-          break
-        case 'extrabold':
-          value = '800'
-          break
-        case 'black':
-          value = '900'
-          break
-      }
-
-      if (value) {
-        return [decl('font-weight', value)]
+        return [
+          atRoot([property('--tw-font-weight')]),
+          decl('--tw-font-weight', value),
+          decl('font-weight', value),
+        ]
       }
     }
   })
@@ -3025,20 +2933,10 @@ export function createUtilities(theme: Theme) {
   suggest('font', () => [
     {
       values: [],
-      valueThemeKeys: ['--font-family'],
+      valueThemeKeys: ['--font'],
     },
     {
-      values: [
-        'thin',
-        'extralight',
-        'light',
-        'normal',
-        'medium',
-        'semibold',
-        'bold',
-        'extrabold',
-        'black',
-      ],
+      values: [],
       valueThemeKeys: ['--font-weight'],
     },
   ])
@@ -3068,6 +2966,7 @@ export function createUtilities(theme: Theme) {
     handleBareValue: ({ value }) => {
       if (!value.endsWith('%')) return null
       let num = Number(value.slice(0, -1))
+      if (!isPositiveInteger(num)) return null
       // Only 50-200% (inclusive) are valid:
       // https://developer.mozilla.org/en-US/docs/Web/CSS/font-stretch#percentage
       if (Number.isNaN(num) || num < 50 || num > 200) return null
@@ -3084,7 +2983,7 @@ export function createUtilities(theme: Theme) {
   colorUtility('placeholder', {
     themeKeys: ['--background-color', '--color'],
     handle: (value) => [
-      rule('&::placeholder', [decl('--tw-sort', 'placeholder-color'), decl('color', value)]),
+      styleRule('&::placeholder', [decl('--tw-sort', 'placeholder-color'), decl('color', value)]),
     ],
   })
 
@@ -3104,7 +3003,7 @@ export function createUtilities(theme: Theme) {
   staticUtility('decoration-from-font', [['text-decoration-thickness', 'from-font']])
 
   utilities.functional('decoration', (candidate) => {
-    if (candidate.negative || !candidate.value) return
+    if (!candidate.value) return
 
     if (candidate.value.kind === 'arbitrary') {
       let value: string | null = candidate.value.value
@@ -3133,7 +3032,7 @@ export function createUtilities(theme: Theme) {
         return [decl('text-decoration-thickness', value)]
       }
 
-      if (!Number.isNaN(Number(candidate.value.value))) {
+      if (isPositiveInteger(candidate.value.value)) {
         if (candidate.modifier) return
         return [decl('text-decoration-thickness', `${candidate.value.value}px`)]
       }
@@ -3153,7 +3052,6 @@ export function createUtilities(theme: Theme) {
       values: ['current', 'inherit', 'transparent'],
       valueThemeKeys: ['--text-decoration-color', '--color'],
       modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-      modifierThemeKeys: ['--opacity'],
     },
     {
       values: ['0', '1', '2'],
@@ -3221,7 +3119,7 @@ export function createUtilities(theme: Theme) {
     }
 
     utilities.functional('filter', (candidate) => {
-      if (candidate.negative || candidate.modifier) return
+      if (candidate.modifier) return
 
       if (candidate.value === null) {
         return [filterProperties(), decl('filter', cssFilterValue)]
@@ -3238,7 +3136,7 @@ export function createUtilities(theme: Theme) {
     })
 
     utilities.functional('backdrop-filter', (candidate) => {
-      if (candidate.negative || candidate.modifier) return
+      if (candidate.modifier) return
 
       if (candidate.value === null) {
         return [
@@ -3292,7 +3190,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('brightness', {
       themeKeys: ['--brightness'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3305,7 +3203,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-brightness', {
       themeKeys: ['--backdrop-brightness', '--brightness'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3333,7 +3231,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('contrast', {
       themeKeys: ['--contrast'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3346,7 +3244,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-contrast', {
       themeKeys: ['--backdrop-contrast', '--contrast'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3374,7 +3272,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('grayscale', {
       themeKeys: ['--grayscale'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       defaultValue: '100%',
@@ -3388,7 +3286,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-grayscale', {
       themeKeys: ['--backdrop-grayscale', '--grayscale'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       defaultValue: '100%',
@@ -3420,7 +3318,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--hue-rotate'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}deg`
       },
       handle: (value) => [
@@ -3434,7 +3332,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--backdrop-hue-rotate', '--hue-rotate'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}deg`
       },
       handle: (value) => [
@@ -3462,7 +3360,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('invert', {
       themeKeys: ['--invert'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       defaultValue: '100%',
@@ -3476,7 +3374,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-invert', {
       themeKeys: ['--backdrop-invert', '--invert'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       defaultValue: '100%',
@@ -3507,7 +3405,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('saturate', {
       themeKeys: ['--saturate'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3520,7 +3418,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-saturate', {
       themeKeys: ['--backdrop-saturate', '--saturate'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3548,7 +3446,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('sepia', {
       themeKeys: ['--sepia'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       defaultValue: '100%',
@@ -3562,7 +3460,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-sepia', {
       themeKeys: ['--backdrop-sepia', '--sepia'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}%`
       },
       defaultValue: '100%',
@@ -3590,6 +3488,11 @@ export function createUtilities(theme: Theme) {
       },
     ])
 
+    staticUtility('drop-shadow-none', [
+      filterProperties,
+      ['--tw-drop-shadow', ' '],
+      ['filter', cssFilterValue],
+    ])
     functionalUtility('drop-shadow', {
       themeKeys: ['--drop-shadow'],
       handle: (value) => [
@@ -3607,7 +3510,7 @@ export function createUtilities(theme: Theme) {
     functionalUtility('backdrop-opacity', {
       themeKeys: ['--backdrop-opacity', '--opacity'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isValidOpacityValue(value)) return null
         return `${value}%`
       },
       handle: (value) => [
@@ -3627,8 +3530,8 @@ export function createUtilities(theme: Theme) {
   }
 
   {
-    let defaultTimingFunction = theme.get(['--default-transition-timing-function']) ?? 'ease'
-    let defaultDuration = theme.get(['--default-transition-duration']) ?? '0s'
+    let defaultTimingFunction = `var(--tw-ease, ${theme.resolve(null, ['--default-transition-timing-function']) ?? 'ease'})`
+    let defaultDuration = `var(--tw-duration, ${theme.resolve(null, ['--default-transition-duration']) ?? '0s'})`
 
     staticUtility('transition-none', [['transition-property', 'none']])
     staticUtility('transition-all', [
@@ -3639,7 +3542,7 @@ export function createUtilities(theme: Theme) {
     staticUtility('transition-colors', [
       [
         'transition-property',
-        'color, background-color, border-color, text-decoration-color, fill, stroke',
+        'color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to',
       ],
       ['transition-timing-function', defaultTimingFunction],
       ['transition-duration', defaultDuration],
@@ -3662,7 +3565,7 @@ export function createUtilities(theme: Theme) {
 
     functionalUtility('transition', {
       defaultValue:
-        'color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter',
+        'color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter',
       themeKeys: ['--transition-property'],
       handle: (value) => [
         decl('transition-property', value),
@@ -3671,46 +3574,58 @@ export function createUtilities(theme: Theme) {
       ],
     })
 
+    staticUtility('transition-discrete', [['transition-behavior', 'allow-discrete']])
+    staticUtility('transition-normal', [['transition-behavior', 'normal']])
+
     functionalUtility('delay', {
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}ms`
       },
       themeKeys: ['--transition-delay'],
       handle: (value) => [decl('transition-delay', value)],
     })
 
-    utilities.functional('duration', (candidate) => {
-      // This utility doesn't support negative values.
-      if (candidate.negative) return
-
-      // This utility doesn't support modifiers.
-      if (candidate.modifier) return
-
-      // This utility doesn't support `DEFAULT` values.
-      if (!candidate.value) return
-
-      // Find the actual CSS value that the candidate value maps to.
-      let value: string | null = null
-
-      if (candidate.value.kind === 'arbitrary') {
-        value = candidate.value.value
-      } else {
-        value = theme.resolve(candidate.value.fraction ?? candidate.value.value, [
-          '--transition-duration',
-        ])
-
-        if (value === null && !Number.isNaN(Number(candidate.value.value))) {
-          value = `${candidate.value.value}ms`
-        }
+    {
+      let transitionDurationProperty = () => {
+        return atRoot([property('--tw-duration')])
       }
 
-      // If the candidate value (like the `sm` in `max-w-sm`) doesn't resolve to
-      // an actual value, don't generate any rules.
-      if (value === null) return
+      staticUtility('duration-initial', [transitionDurationProperty, ['--tw-duration', 'initial']])
 
-      return [decl('transition-duration', value)]
-    })
+      utilities.functional('duration', (candidate) => {
+        // This utility doesn't support modifiers.
+        if (candidate.modifier) return
+
+        // This utility doesn't support `DEFAULT` values.
+        if (!candidate.value) return
+
+        // Find the actual CSS value that the candidate value maps to.
+        let value: string | null = null
+
+        if (candidate.value.kind === 'arbitrary') {
+          value = candidate.value.value
+        } else {
+          value = theme.resolve(candidate.value.fraction ?? candidate.value.value, [
+            '--transition-duration',
+          ])
+
+          if (value === null && isPositiveInteger(candidate.value.value)) {
+            value = `${candidate.value.value}ms`
+          }
+        }
+
+        // If the candidate value (like the `sm` in `max-w-sm`) doesn't resolve to
+        // an actual value, don't generate any rules.
+        if (value === null) return
+
+        return [
+          transitionDurationProperty(),
+          decl('--tw-duration', value),
+          decl('transition-duration', value),
+        ]
+      })
+    }
 
     suggest('delay', () => [
       {
@@ -3727,10 +3642,26 @@ export function createUtilities(theme: Theme) {
     ])
   }
 
-  functionalUtility('ease', {
-    themeKeys: ['--transition-timing-function'],
-    handle: (value) => [decl('transition-timing-function', value)],
-  })
+  {
+    let transitionTimingFunctionProperty = () => {
+      return atRoot([property('--tw-ease')])
+    }
+
+    staticUtility('ease-initial', [transitionTimingFunctionProperty, ['--tw-ease', 'initial']])
+    staticUtility('ease-linear', [
+      transitionTimingFunctionProperty,
+      ['--tw-ease', 'linear'],
+      ['transition-timing-function', 'linear'],
+    ])
+    functionalUtility('ease', {
+      themeKeys: ['--ease'],
+      handle: (value) => [
+        transitionTimingFunctionProperty(),
+        decl('--tw-ease', value),
+        decl('transition-timing-function', value),
+      ],
+    })
+  }
 
   staticUtility('will-change-auto', [['will-change', 'auto']])
   staticUtility('will-change-scroll', [['will-change', 'scroll-position']])
@@ -3809,15 +3740,25 @@ export function createUtilities(theme: Theme) {
   staticUtility('forced-color-adjust-none', [['forced-color-adjust', 'none']])
   staticUtility('forced-color-adjust-auto', [['forced-color-adjust', 'auto']])
 
-  functionalUtility('leading', {
-    themeKeys: ['--line-height'],
-    handle: (value) => [decl('line-height', value)],
-  })
+  staticUtility('leading-none', [
+    () => atRoot([property('--tw-leading')]),
+    ['--tw-leading', '1'],
+    ['line-height', '1'],
+  ])
+  spacingUtility('leading', ['--leading', '--spacing'], (value) => [
+    atRoot([property('--tw-leading')]),
+    decl('--tw-leading', value),
+    decl('line-height', value),
+  ])
 
   functionalUtility('tracking', {
     supportsNegative: true,
-    themeKeys: ['--letter-spacing'],
-    handle: (value) => [decl('letter-spacing', value)],
+    themeKeys: ['--tracking'],
+    handle: (value) => [
+      atRoot([property('--tw-tracking')]),
+      decl('--tw-tracking', value),
+      decl('letter-spacing', value),
+    ],
   })
 
   staticUtility('antialiased', [
@@ -3896,17 +3837,26 @@ export function createUtilities(theme: Theme) {
 
   {
     let outlineProperties = () => {
-      return atRoot([property('--tw-outline-style', 'solid', '<custom-ident>')])
+      return atRoot([property('--tw-outline-style', 'solid')])
     }
 
-    staticUtility('outline-none', [
-      ['outline', '2px solid transparent'],
-      ['outline-offset', '2px'],
-    ])
+    utilities.static('outline-hidden', () => {
+      return [
+        decl('outline-style', 'none'),
+        atRule('@media', '(forced-colors: active)', [
+          decl('outline', '2px solid transparent'),
+          decl('outline-offset', '2px'),
+        ]),
+      ]
+    })
 
     /**
      * @css `outline-style`
      */
+    staticUtility('outline-none', [
+      ['--tw-outline-style', 'none'],
+      ['outline-style', 'none'],
+    ])
     staticUtility('outline-solid', [
       ['--tw-outline-style', 'solid'],
       ['outline-style', 'solid'],
@@ -3925,8 +3875,6 @@ export function createUtilities(theme: Theme) {
     ])
 
     utilities.functional('outline', (candidate) => {
-      if (candidate.negative) return
-
       if (candidate.value === null) {
         if (candidate.modifier) return
         return [
@@ -3980,7 +3928,7 @@ export function createUtilities(theme: Theme) {
             decl('outline-style', 'var(--tw-outline-style)'),
             decl('outline-width', value),
           ]
-        } else if (!Number.isNaN(Number(candidate.value.value))) {
+        } else if (isPositiveInteger(candidate.value.value)) {
           return [
             outlineProperties(),
             decl('outline-style', 'var(--tw-outline-style)'),
@@ -3995,7 +3943,6 @@ export function createUtilities(theme: Theme) {
         values: ['current', 'inherit', 'transparent'],
         valueThemeKeys: ['--outline-color', '--color'],
         modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
         hasDefaultValue: true,
       },
       {
@@ -4008,7 +3955,7 @@ export function createUtilities(theme: Theme) {
       supportsNegative: true,
       themeKeys: ['--outline-offset'],
       handleBareValue: ({ value }) => {
-        if (Number.isNaN(Number(value))) return null
+        if (!isPositiveInteger(value)) return null
         return `${value}px`
       },
       handle: (value) => [decl('outline-offset', value)],
@@ -4016,6 +3963,7 @@ export function createUtilities(theme: Theme) {
 
     suggest('outline-offset', () => [
       {
+        supportsNegative: true,
         values: ['0', '1', '2', '4', '8'],
         valueThemeKeys: ['--outline-offset'],
       },
@@ -4025,7 +3973,7 @@ export function createUtilities(theme: Theme) {
   functionalUtility('opacity', {
     themeKeys: ['--opacity'],
     handleBareValue: ({ value }) => {
-      if (Number.isNaN(Number(value))) return null
+      if (!isValidOpacityValue(value)) return null
       return `${value}%`
     },
     handle: (value) => [decl('opacity', value)],
@@ -4043,7 +3991,7 @@ export function createUtilities(theme: Theme) {
     supportsNegative: true,
     themeKeys: ['--text-underline-offset'],
     handleBareValue: ({ value }) => {
-      if (Number.isNaN(Number(value))) return null
+      if (!isPositiveInteger(value)) return null
       return `${value}px`
     },
     handle: (value) => [decl('text-underline-offset', value)],
@@ -4058,7 +4006,7 @@ export function createUtilities(theme: Theme) {
   ])
 
   utilities.functional('text', (candidate) => {
-    if (candidate.negative || !candidate.value) return
+    if (!candidate.value) return
 
     if (candidate.value.kind === 'arbitrary') {
       let value: string | null = candidate.value.value
@@ -4076,11 +4024,24 @@ export function createUtilities(theme: Theme) {
             let modifier =
               candidate.modifier.kind === 'arbitrary'
                 ? candidate.modifier.value
-                : theme.resolve(candidate.modifier.value, ['--line-height'])
+                : theme.resolve(candidate.modifier.value, ['--leading'])
+
+            if (!modifier && isValidSpacingMultiplier(candidate.modifier.value)) {
+              let multiplier = theme.resolve(null, ['--spacing'])
+              if (!multiplier) return null
+              modifier = `calc(${multiplier} * ${candidate.modifier.value})`
+            }
+
+            // Shorthand for `leading-none`
+            if (!modifier && candidate.modifier.value === 'none') {
+              modifier = '1'
+            }
 
             if (modifier) {
               return [decl('font-size', value), decl('line-height', modifier)]
             }
+
+            return null
           }
 
           return [decl('font-size', value)]
@@ -4106,7 +4067,7 @@ export function createUtilities(theme: Theme) {
     {
       let value = theme.resolveWith(
         candidate.value.value,
-        ['--font-size'],
+        ['--text'],
         ['--line-height', '--letter-spacing', '--font-weight'],
       )
       if (value) {
@@ -4116,7 +4077,22 @@ export function createUtilities(theme: Theme) {
           let modifier =
             candidate.modifier.kind === 'arbitrary'
               ? candidate.modifier.value
-              : theme.resolve(candidate.modifier.value, ['--line-height'])
+              : theme.resolve(candidate.modifier.value, ['--leading'])
+
+          if (!modifier && isValidSpacingMultiplier(candidate.modifier.value)) {
+            let multiplier = theme.resolve(null, ['--spacing'])
+            if (!multiplier) return null
+            modifier = `calc(${multiplier} * ${candidate.modifier.value})`
+          }
+
+          // Shorthand for `leading-none`
+          if (!modifier && candidate.modifier.value === 'none') {
+            modifier = '1'
+          }
+
+          if (!modifier) {
+            return null
+          }
 
           let declarations = [decl('font-size', fontSize)]
           modifier && declarations.push(decl('line-height', modifier))
@@ -4129,9 +4105,22 @@ export function createUtilities(theme: Theme) {
 
         return [
           decl('font-size', fontSize),
-          decl('line-height', options['--line-height']),
-          decl('letter-spacing', options['--letter-spacing']),
-          decl('font-weight', options['--font-weight']),
+          decl(
+            'line-height',
+            options['--line-height'] ? `var(--tw-leading, ${options['--line-height']})` : undefined,
+          ),
+          decl(
+            'letter-spacing',
+            options['--letter-spacing']
+              ? `var(--tw-tracking, ${options['--letter-spacing']})`
+              : undefined,
+          ),
+          decl(
+            'font-weight',
+            options['--font-weight']
+              ? `var(--tw-font-weight, ${options['--font-weight']})`
+              : undefined,
+          ),
         ]
       }
     }
@@ -4142,13 +4131,12 @@ export function createUtilities(theme: Theme) {
       values: ['current', 'inherit', 'transparent'],
       valueThemeKeys: ['--text-color', '--color'],
       modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-      modifierThemeKeys: ['--opacity'],
     },
     {
       values: [],
-      valueThemeKeys: ['--font-size'],
+      valueThemeKeys: ['--text'],
       modifiers: [],
-      modifierThemeKeys: ['--line-height'],
+      modifierThemeKeys: ['--leading'],
     },
   ])
 
@@ -4165,9 +4153,9 @@ export function createUtilities(theme: Theme) {
     let boxShadowProperties = () => {
       return atRoot([
         property('--tw-shadow', nullShadow),
-        property('--tw-shadow-colored', nullShadow),
+        property('--tw-shadow-color'),
         property('--tw-inset-shadow', nullShadow),
-        property('--tw-inset-shadow-colored', nullShadow),
+        property('--tw-inset-shadow-color'),
         property('--tw-ring-color'),
         property('--tw-ring-shadow', nullShadow),
         property('--tw-inset-ring-color'),
@@ -4181,112 +4169,18 @@ export function createUtilities(theme: Theme) {
       ])
     }
 
-    utilities.functional('shadow', (candidate) => {
-      if (candidate.negative) return
+    staticUtility('shadow-initial', [boxShadowProperties, ['--tw-shadow-color', 'initial']])
 
+    utilities.functional('shadow', (candidate) => {
       if (!candidate.value) {
         let value = theme.get(['--shadow'])
         if (value === null) return
 
         return [
           boxShadowProperties(),
-          decl('--tw-shadow', value),
-          decl('--tw-shadow-colored', replaceShadowColors(value, 'var(--tw-shadow-color)')),
-          decl('box-shadow', cssBoxShadowValue),
-        ]
-      }
-
-      if (candidate.value.kind === 'arbitrary') {
-        let value: string | null = candidate.value.value
-        let type = candidate.value.dataType ?? inferDataType(value, ['color'])
-
-        switch (type) {
-          case 'color': {
-            value = asColor(value, candidate.modifier, theme)
-            if (value === null) return
-
-            return [
-              boxShadowProperties(),
-              decl('--tw-shadow-color', value),
-              decl('--tw-shadow', 'var(--tw-shadow-colored)'),
-            ]
-          }
-          default: {
-            return [
-              boxShadowProperties(),
-              decl('--tw-shadow', value),
-              decl('--tw-shadow-colored', replaceShadowColors(value, 'var(--tw-shadow-color)')),
-              decl('box-shadow', cssBoxShadowValue),
-            ]
-          }
-        }
-      }
-
-      switch (candidate.value.value) {
-        case 'none':
-          if (candidate.modifier) return
-          return [
-            boxShadowProperties(),
-            decl('--tw-shadow', nullShadow),
-            decl('--tw-shadow-colored', nullShadow),
-            decl('box-shadow', cssBoxShadowValue),
-          ]
-      }
-
-      // Shadow size
-      {
-        let value = theme.get([`--shadow-${candidate.value.value}`])
-        if (value) {
-          if (candidate.modifier) return
-          return [
-            boxShadowProperties(),
-            decl('--tw-shadow', value),
-            decl('--tw-shadow-colored', replaceShadowColors(value, 'var(--tw-shadow-color)')),
-            decl('box-shadow', cssBoxShadowValue),
-          ]
-        }
-      }
-
-      // Shadow color
-      {
-        let value = resolveThemeColor(candidate, theme, ['--box-shadow-color', '--color'])
-        if (value) {
-          return [
-            boxShadowProperties(),
-            decl('--tw-shadow-color', value),
-            decl('--tw-shadow', 'var(--tw-shadow-colored)'),
-          ]
-        }
-      }
-    })
-
-    suggest('shadow', () => [
-      {
-        values: ['current', 'inherit', 'transparent'],
-        valueThemeKeys: ['--box-shadow-color', '--color'],
-        modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
-      },
-      {
-        values: [],
-        valueThemeKeys: ['--shadow'],
-        hasDefaultValue: true,
-      },
-    ])
-
-    utilities.functional('inset-shadow', (candidate) => {
-      if (candidate.negative) return
-
-      if (!candidate.value) {
-        let value = theme.get(['--inset-shadow'])
-        if (value === null) return
-
-        return [
-          boxShadowProperties(),
-          decl('--tw-inset-shadow', value),
           decl(
-            '--tw-inset-shadow-colored',
-            replaceShadowColors(value, 'var(--tw-inset-shadow-color)'),
+            '--tw-shadow',
+            replaceShadowColors(value, (color) => `var(--tw-shadow-color, ${color})`),
           ),
           decl('box-shadow', cssBoxShadowValue),
         ]
@@ -4301,19 +4195,106 @@ export function createUtilities(theme: Theme) {
             value = asColor(value, candidate.modifier, theme)
             if (value === null) return
 
-            return [
-              boxShadowProperties(),
-              decl('--tw-inset-shadow-color', value),
-              decl('--tw-inset-shadow', 'var(--tw-inset-shadow-colored)'),
-            ]
+            return [boxShadowProperties(), decl('--tw-shadow-color', value)]
           }
           default: {
             return [
               boxShadowProperties(),
-              decl('--tw-inset-shadow', `inset ${value}`),
               decl(
-                '--tw-inset-shadow-colored',
-                replaceShadowColors(`inset ${value}`, 'var(--tw-inset-shadow-color)'),
+                '--tw-shadow',
+                replaceShadowColors(value, (color) => `var(--tw-shadow-color, ${color})`),
+              ),
+              decl('box-shadow', cssBoxShadowValue),
+            ]
+          }
+        }
+      }
+
+      switch (candidate.value.value) {
+        case 'none':
+          if (candidate.modifier) return
+          return [
+            boxShadowProperties(),
+            decl('--tw-shadow', nullShadow),
+            decl('box-shadow', cssBoxShadowValue),
+          ]
+      }
+
+      // Shadow size
+      {
+        let value = theme.get([`--shadow-${candidate.value.value}`])
+        if (value) {
+          if (candidate.modifier) return
+          return [
+            boxShadowProperties(),
+            decl(
+              '--tw-shadow',
+              replaceShadowColors(value, (color) => `var(--tw-shadow-color, ${color})`),
+            ),
+            decl('box-shadow', cssBoxShadowValue),
+          ]
+        }
+      }
+
+      // Shadow color
+      {
+        let value = resolveThemeColor(candidate, theme, ['--box-shadow-color', '--color'])
+        if (value) {
+          return [boxShadowProperties(), decl('--tw-shadow-color', value)]
+        }
+      }
+    })
+
+    suggest('shadow', () => [
+      {
+        values: ['current', 'inherit', 'transparent'],
+        valueThemeKeys: ['--box-shadow-color', '--color'],
+        modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
+      },
+      {
+        values: ['none'],
+        valueThemeKeys: ['--shadow'],
+        hasDefaultValue: true,
+      },
+    ])
+
+    staticUtility('inset-shadow-initial', [
+      boxShadowProperties,
+      ['--tw-inset-shadow-color', 'initial'],
+    ])
+
+    utilities.functional('inset-shadow', (candidate) => {
+      if (!candidate.value) {
+        let value = theme.get(['--inset-shadow'])
+        if (value === null) return
+
+        return [
+          boxShadowProperties(),
+          decl(
+            '--tw-inset-shadow',
+            replaceShadowColors(value, (color) => `var(--tw-inset-shadow-color, ${color})`),
+          ),
+          decl('box-shadow', cssBoxShadowValue),
+        ]
+      }
+
+      if (candidate.value.kind === 'arbitrary') {
+        let value: string | null = candidate.value.value
+        let type = candidate.value.dataType ?? inferDataType(value, ['color'])
+
+        switch (type) {
+          case 'color': {
+            value = asColor(value, candidate.modifier, theme)
+            if (value === null) return
+
+            return [boxShadowProperties(), decl('--tw-inset-shadow-color', value)]
+          }
+          default: {
+            return [
+              boxShadowProperties(),
+              decl(
+                '--tw-inset-shadow',
+                `inset ${replaceShadowColors(value, (color) => `var(--tw-inset-shadow-color, ${color})`)}`,
               ),
               decl('box-shadow', cssBoxShadowValue),
             ]
@@ -4327,7 +4308,6 @@ export function createUtilities(theme: Theme) {
           return [
             boxShadowProperties(),
             decl('--tw-inset-shadow', nullShadow),
-            decl('--tw-inset-shadow-colored', nullShadow),
             decl('box-shadow', cssBoxShadowValue),
           ]
       }
@@ -4340,10 +4320,9 @@ export function createUtilities(theme: Theme) {
           if (candidate.modifier) return
           return [
             boxShadowProperties(),
-            decl('--tw-inset-shadow', value),
             decl(
-              '--tw-inset-shadow-colored',
-              replaceShadowColors(value, 'var(--tw-inset-shadow-color)'),
+              '--tw-inset-shadow',
+              replaceShadowColors(value, (color) => `var(--tw-inset-shadow-color, ${color})`),
             ),
             decl('box-shadow', cssBoxShadowValue),
           ]
@@ -4354,11 +4333,7 @@ export function createUtilities(theme: Theme) {
       {
         let value = resolveThemeColor(candidate, theme, ['--box-shadow-color', '--color'])
         if (value) {
-          return [
-            boxShadowProperties(),
-            decl('--tw-inset-shadow-color', value),
-            decl('--tw-inset-shadow', 'var(--tw-inset-shadow-colored)'),
-          ]
+          return [boxShadowProperties(), decl('--tw-inset-shadow-color', value)]
         }
       }
     })
@@ -4368,11 +4343,10 @@ export function createUtilities(theme: Theme) {
         values: ['current', 'inherit', 'transparent'],
         valueThemeKeys: ['--box-shadow-color', '--color'],
         modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
       },
       {
         values: [],
-        valueThemeKeys: ['--shadow'],
+        valueThemeKeys: ['--inset-shadow'],
         hasDefaultValue: true,
       },
     ])
@@ -4384,8 +4358,6 @@ export function createUtilities(theme: Theme) {
       return `var(--tw-ring-inset,) 0 0 0 calc(${value} + var(--tw-ring-offset-width)) var(--tw-ring-color, ${defaultRingColor})`
     }
     utilities.functional('ring', (candidate) => {
-      if (candidate.negative) return
-
       if (!candidate.value) {
         if (candidate.modifier) return
         let value = theme.get(['--default-ring-width']) ?? '1px'
@@ -4430,7 +4402,7 @@ export function createUtilities(theme: Theme) {
       {
         if (candidate.modifier) return
         let value = theme.resolve(candidate.value.value, ['--ring-width'])
-        if (value === null && !Number.isNaN(Number(candidate.value.value))) {
+        if (value === null && isPositiveInteger(candidate.value.value)) {
           value = `${candidate.value.value}px`
         }
         if (value) {
@@ -4448,7 +4420,6 @@ export function createUtilities(theme: Theme) {
         values: ['current', 'inherit', 'transparent'],
         valueThemeKeys: ['--ring-color', '--color'],
         modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
       },
       {
         values: ['0', '1', '2', '4', '8'],
@@ -4461,8 +4432,6 @@ export function createUtilities(theme: Theme) {
       return `inset 0 0 0 ${value} var(--tw-inset-ring-color, currentColor)`
     }
     utilities.functional('inset-ring', (candidate) => {
-      if (candidate.negative) return
-
       if (!candidate.value) {
         if (candidate.modifier) return
         return [
@@ -4506,7 +4475,7 @@ export function createUtilities(theme: Theme) {
       {
         if (candidate.modifier) return
         let value = theme.resolve(candidate.value.value, ['--ring-width'])
-        if (value === null && !Number.isNaN(Number(candidate.value.value))) {
+        if (value === null && isPositiveInteger(candidate.value.value)) {
           value = `${candidate.value.value}px`
         }
         if (value) {
@@ -4524,7 +4493,6 @@ export function createUtilities(theme: Theme) {
         values: ['current', 'inherit', 'transparent'],
         valueThemeKeys: ['--ring-color', '--color'],
         modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-        modifierThemeKeys: ['--opacity'],
       },
       {
         values: ['0', '1', '2', '4', '8'],
@@ -4536,7 +4504,7 @@ export function createUtilities(theme: Theme) {
     let ringOffsetShadowValue =
       'var(--tw-ring-inset,) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color)'
     utilities.functional('ring-offset', (candidate) => {
-      if (candidate.negative || !candidate.value) return
+      if (!candidate.value) return
 
       if (candidate.value.kind === 'arbitrary') {
         let value: string | null = candidate.value.value
@@ -4568,7 +4536,7 @@ export function createUtilities(theme: Theme) {
             decl('--tw-ring-offset-width', value),
             decl('--tw-ring-offset-shadow', ringOffsetShadowValue),
           ]
-        } else if (!Number.isNaN(Number(candidate.value.value))) {
+        } else if (isPositiveInteger(candidate.value.value)) {
           if (candidate.modifier) return
           return [
             decl('--tw-ring-offset-width', `${candidate.value.value}px`),
@@ -4592,7 +4560,6 @@ export function createUtilities(theme: Theme) {
       values: ['current', 'inherit', 'transparent'],
       valueThemeKeys: ['--ring-offset-color', '--color'],
       modifiers: Array.from({ length: 21 }, (_, index) => `${index * 5}`),
-      modifierThemeKeys: ['--opacity'],
     },
     {
       values: ['0', '1', '2', '4', '8'],
@@ -4601,8 +4568,6 @@ export function createUtilities(theme: Theme) {
   ])
 
   utilities.functional('@container', (candidate) => {
-    if (candidate.negative) return
-
     let value: string | null = null
     if (candidate.value === null) {
       value = 'inline-size'
@@ -4625,9 +4590,393 @@ export function createUtilities(theme: Theme) {
     {
       values: ['normal'],
       valueThemeKeys: [],
-      hasDefaultValue: false,
+      hasDefaultValue: true,
     },
   ])
 
   return utilities
+}
+
+export function createCssUtility(node: AtRule) {
+  let name = node.params
+
+  // Functional utilities. E.g.: `tab-size-*`
+  if (IS_VALID_FUNCTIONAL_UTILITY_NAME.test(name)) {
+    // API:
+    //
+    // - `--value(number)`            resolves a bare value of type number
+    // - `--value([number])`          resolves an arbitrary value of type number
+    // - `--value(--color)`           resolves a theme value in the `color` namespace
+    // - `--value(number, [number])`  resolves a bare value of type number or an
+    //                                arbitrary value of type number in order.
+    //
+    // Rules:
+    //
+    // - If `--value(…)` does not resolve to a valid value, the declaration is
+    //   removed.
+    // - If a `--value(ratio)` resolves, the `--modifier(…)` cannot be used.
+    // - If a candidate looks like `foo-2/3`, then the `--value(ratio)` should
+    //   be used OR the `--value(…)` and `--modifier(…)` must be used. But not
+    //   both.
+    // - All parts of the candidate must resolve, otherwise it's not a valid
+    //   utility. E.g.:`
+    //   ```
+    //   @utility foo-* {
+    //     test: --value(number)
+    //   }
+    //   ```
+    //   If you then use `foo-1/2`, this is invalid, because the modifier is not used.
+
+    return (designSystem: DesignSystem) => {
+      let valueThemeKeys = new Set<`--${string}`>()
+      let modifierThemeKeys = new Set<`--${string}`>()
+
+      // Pre-process the AST to make it easier to work with.
+      //
+      // - Normalize theme values used in `--value(…)` and `--modifier(…)`
+      //   functions.
+      // - Track information for suggestions
+      walk(node.nodes, (child) => {
+        if (child.kind !== 'declaration') return
+        if (!child.value) return
+        if (!child.value.includes('--value(') && !child.value.includes('--modifier(')) return
+
+        let declarationValueAst = ValueParser.parse(child.value)
+
+        // Required manipulations:
+        //
+        // - `--value(--spacing)` -> `--value(--spacing-*)`
+        // - `--value(--spacing- *)` -> `--value(--spacing-*)`
+        // - `--value(--text- * --line-height)` -> `--value(--text-*--line-height)`
+        // - `--value(--text --line-height)` -> `--value(--text-*--line-height)`
+        // - `--value(--text-\\* --line-height)` -> `--value(--text-*--line-height)`
+        // - `--value([ *])` -> `--value([*])`
+        //
+        // Once Prettier / Biome handle these better (e.g.: not crashing without
+        // `\\*` or not inserting whitespace) then most of these can go away.
+        ValueParser.walk(declarationValueAst, (fn) => {
+          if (fn.kind !== 'function') return
+          if (fn.value !== '--value' && fn.value !== '--modifier') return
+
+          let args = segment(ValueParser.toCss(fn.nodes), ',')
+          for (let [idx, arg] of args.entries()) {
+            // Transform escaped `\\*` -> `*`
+            arg = arg.replace(/\\\*/g, '*')
+
+            // Ensure `--value(--foo --bar)` becomes `--value(--foo-*--bar)`
+            arg = arg.replace(/--(.*?)\s--(.*?)/g, '--$1-*--$2')
+
+            // Remove whitespace, e.g.: `--value([ *])` -> `--value([*])`
+            arg = arg.replace(/\s+/g, '')
+
+            // Ensure multiple `-*` becomes a single `-*`
+            arg = arg.replace(/(-\*){2,}/g, '-*')
+
+            // Ensure trailing `-*` exists if `-*` isn't present yet
+            if (arg[0] === '-' && arg[1] === '-' && !arg.includes('-*')) {
+              arg += '-*'
+            }
+
+            args[idx] = arg
+          }
+          fn.nodes = ValueParser.parse(args.join(','))
+
+          // Track the theme keys for suggestions
+          for (let node of fn.nodes) {
+            if (node.kind === 'word' && node.value[0] === '-' && node.value[1] === '-') {
+              let value = node.value.replace(/-\*.*$/g, '') as `--${string}`
+
+              if (fn.value === '--value') {
+                valueThemeKeys.add(value)
+              } else if (fn.value === '--modifier') {
+                modifierThemeKeys.add(value)
+              }
+            }
+          }
+        })
+
+        child.value = ValueParser.toCss(declarationValueAst)
+      })
+
+      designSystem.utilities.functional(name.slice(0, -2), (candidate) => {
+        let atRule = structuredClone(node)
+
+        let value = candidate.value
+        let modifier = candidate.modifier
+
+        // A value is required for functional utilities, if you want to accept
+        // just `tab-size`, you'd have to use a static utility.
+        if (value === null) return
+
+        // Whether `--value(…)` was used
+        let usedValueFn = false
+
+        // Whether any of the declarations successfully resolved a `--value(…)`.
+        // E.g:
+        // ```css
+        // @utility tab-size-* {
+        //   tab-size: --value(integer);
+        //   tab-size: --value(--tab-size);
+        //   tab-size: --value([integer]);
+        // }
+        // ```
+        // Any of these `tab-size` declarations have to resolve to a valid in
+        // order to make the utility valid.
+        let resolvedValueFn = false
+
+        // Whether `--modifier(…)` was used
+        let usedModifierFn = false
+
+        // Whether any of the declarations successfully resolved a `--modifier(…)`
+        let resolvedModifierFn = false
+
+        // A map of all declarations we replaced and their parent rules. We
+        // might need to remove some later on. E.g.: remove declarations that
+        // used `--value(number)` when `--value(ratio)` was resolved.
+        let resolvedDeclarations = new Map<Declaration, AtRule | Rule>()
+
+        // Whether `--value(ratio)` was resolved
+        let resolvedRatioValue = false
+
+        walk([atRule], (node, { parent, replaceWith: replaceDeclarationWith }) => {
+          if (parent?.kind !== 'rule' && parent?.kind !== 'at-rule') return
+          if (node.kind !== 'declaration') return
+          if (!node.value) return
+
+          let valueAst = ValueParser.parse(node.value)
+          let result =
+            ValueParser.walk(valueAst, (valueNode, { replaceWith }) => {
+              if (valueNode.kind !== 'function') return
+
+              // Value function, e.g.: `--value(integer)`
+              if (valueNode.value === '--value') {
+                usedValueFn = true
+
+                let resolved = resolveValueFunction(value, valueNode, designSystem)
+                if (resolved) {
+                  resolvedValueFn = true
+                  if (resolved.ratio) {
+                    resolvedRatioValue = true
+                  } else {
+                    resolvedDeclarations.set(node, parent)
+                  }
+                  replaceWith(resolved.nodes)
+                  return ValueParser.ValueWalkAction.Skip
+                }
+
+                // Drop the declaration in case we couldn't resolve the value
+                usedValueFn ||= false
+                replaceDeclarationWith([])
+                return ValueParser.ValueWalkAction.Stop
+              }
+
+              // Modifier function, e.g.: `--modifier(integer)`
+              else if (valueNode.value === '--modifier') {
+                // If there is no modifier present in the candidate, then the
+                // declaration can be removed.
+                if (modifier === null) {
+                  replaceDeclarationWith([])
+                  return ValueParser.ValueWalkAction.Skip
+                }
+
+                usedModifierFn = true
+
+                let replacement = resolveValueFunction(modifier, valueNode, designSystem)
+                if (replacement) {
+                  resolvedModifierFn = true
+                  replaceWith(replacement.nodes)
+                  return ValueParser.ValueWalkAction.Skip
+                }
+
+                // Drop the declaration in case we couldn't resolve the value
+                usedModifierFn ||= false
+                replaceDeclarationWith([])
+                return ValueParser.ValueWalkAction.Stop
+              }
+            }) ?? ValueParser.ValueWalkAction.Continue
+
+          if (result === ValueParser.ValueWalkAction.Continue) {
+            node.value = ValueParser.toCss(valueAst)
+          }
+        })
+
+        // Used `--value(…)` but nothing resolved
+        if (usedValueFn && !resolvedValueFn) return null
+
+        // Used `--modifier(…)` but nothing resolved
+        if (usedModifierFn && !resolvedModifierFn) return null
+
+        // Resolved `--value(ratio)` and `--modifier(…)`, which is invalid
+        if (resolvedRatioValue && resolvedModifierFn) return null
+
+        // When a candidate has a modifier, then the `--modifier(…)` must
+        // resolve correctly or the `--value(ratio)` must resolve correctly.
+        if (modifier && !resolvedRatioValue && !resolvedModifierFn) return null
+
+        // Resolved `--value(ratio)`, so all other declarations that didn't use
+        // `--value(ratio)` should be removed. E.g.: `--value(number)` would
+        // otherwise resolve for `foo-1/2`.
+        if (resolvedRatioValue) {
+          for (let [declaration, parent] of resolvedDeclarations) {
+            let idx = parent.nodes.indexOf(declaration)
+            if (idx !== -1) parent.nodes.splice(idx, 1)
+          }
+        }
+
+        return atRule.nodes
+      })
+
+      designSystem.utilities.suggest(name.slice(0, -2), () => {
+        return [
+          {
+            values: designSystem.theme
+              .keysInNamespaces(valueThemeKeys)
+              .map((x) => x.replaceAll('_', '.')),
+            modifiers: designSystem.theme
+              .keysInNamespaces(modifierThemeKeys)
+              .map((x) => x.replaceAll('_', '.')),
+          },
+        ] satisfies SuggestionGroup[]
+      })
+    }
+  }
+
+  if (IS_VALID_STATIC_UTILITY_NAME.test(name)) {
+    return (designSystem: DesignSystem) => {
+      designSystem.utilities.static(name, () => structuredClone(node.nodes))
+    }
+  }
+
+  return null
+}
+
+function resolveValueFunction(
+  value: NonNullable<
+    | Extract<Candidate, { kind: 'functional' }>['value']
+    | Extract<Candidate, { kind: 'functional' }>['modifier']
+  >,
+  fn: ValueParser.ValueFunctionNode,
+  designSystem: DesignSystem,
+): { nodes: ValueParser.ValueAstNode[]; ratio?: boolean } | undefined {
+  for (let arg of fn.nodes) {
+    // Resolving theme value, e.g.: `--value(--color)`
+    if (
+      value.kind === 'named' &&
+      arg.kind === 'word' &&
+      arg.value[0] === '-' &&
+      arg.value[1] === '-'
+    ) {
+      let themeKey = arg.value as `--${string}`
+
+      // Resolve the theme value, e.g.: `--value(--color)`
+      if (themeKey.endsWith('-*')) {
+        // Without `-*` postfix
+        themeKey = themeKey.slice(0, -2) as `--${string}`
+
+        let resolved = designSystem.theme.resolve(value.value, [themeKey])
+        if (resolved) return { nodes: ValueParser.parse(resolved) }
+      }
+
+      // Split `--text-*--line-height` into `--text` and `--line-height`
+      else {
+        let nestedKeys = themeKey.split('-*') as `--${string}`[]
+        if (nestedKeys.length <= 1) continue
+
+        // Resolve theme values with nested keys, e.g.: `--value(--text-*--line-height)`
+        let themeKeys = [nestedKeys.shift()!]
+        let resolved = designSystem.theme.resolveWith(value.value, themeKeys, nestedKeys)
+        if (resolved) {
+          let [, options = {}] = resolved
+
+          // Resolve the value from the `options`
+          {
+            let resolved = options[nestedKeys.pop()!]
+            if (resolved) return { nodes: ValueParser.parse(resolved) }
+          }
+        }
+      }
+    }
+
+    // Bare value, e.g.: `--value(integer)`
+    else if (value.kind === 'named' && arg.kind === 'word') {
+      // Limit the bare value types, to prevent new syntax that we
+      // don't want to support. E.g.: `text-#000` is something we
+      // don't want to support, but could be built this way.
+      if (
+        arg.value !== 'number' &&
+        arg.value !== 'integer' &&
+        arg.value !== 'ratio' &&
+        arg.value !== 'percentage'
+      ) {
+        continue
+      }
+
+      let resolved = arg.value === 'ratio' && 'fraction' in value ? value.fraction : value.value
+      if (!resolved) continue
+
+      let type = inferDataType(resolved, [arg.value as any])
+      if (type === null) continue
+
+      // Ratio must be a valid fraction, e.g.: <integer>/<integer>
+      if (type === 'ratio') {
+        let [lhs, rhs] = segment(resolved, '/')
+        if (!isPositiveInteger(lhs) || !isPositiveInteger(rhs)) continue
+      }
+
+      // Non-integer numbers should be a valid multiplier,
+      // e.g.: `1.5`
+      else if (type === 'number' && !isValidSpacingMultiplier(resolved)) {
+        continue
+      }
+
+      // Percentages must be an integer, e.g.: `50%`
+      else if (type === 'percentage' && !isPositiveInteger(resolved.slice(0, -1))) {
+        continue
+      }
+
+      return { nodes: ValueParser.parse(resolved), ratio: type === 'ratio' }
+    }
+
+    // Arbitrary value, e.g.: `--value([integer])`
+    else if (
+      value.kind === 'arbitrary' &&
+      arg.kind === 'word' &&
+      arg.value[0] === '[' &&
+      arg.value[arg.value.length - 1] === ']'
+    ) {
+      let dataType = arg.value.slice(1, -1)
+
+      // Allow any data type, e.g.: `--value([*])`
+      if (dataType === '*') {
+        return { nodes: ValueParser.parse(value.value) }
+      }
+
+      // The forced arbitrary value hint must match the expected
+      // data type.
+      //
+      // ```css
+      // @utility tab-* {
+      //   tab-size: --value([integer]);
+      // }
+      // ```
+      //
+      // Given a candidate like `tab-(color:var(--my-value))`,
+      // should not match because `color` and `integer` don't
+      // match.
+      if ('dataType' in value && value.dataType && value.dataType !== dataType) {
+        continue
+      }
+
+      // Use the provided data type hint
+      if ('dataType' in value && value.dataType) {
+        return { nodes: ValueParser.parse(value.value) }
+      }
+
+      // No data type hint provided, so we have to infer it
+      let type = inferDataType(value.value, [dataType as any])
+      if (type !== null) {
+        return { nodes: ValueParser.parse(value.value) }
+      }
+    }
+  }
 }

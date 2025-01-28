@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "ui": "tui",
+  "tasks": {
     "@tailwindcss/oxide#build": {
       "dependsOn": ["^build"],
       "outputs": ["./index.d.ts", "./index.js", "./*.node"],
@@ -9,8 +10,8 @@
         "./build.rs",
         "./package.json",
         "./Cargo.toml",
-        "../core/src/**/*",
-        "../core/Cargo.toml",
+        "../oxide/src/**/*",
+        "../oxide/Cargo.toml",
         "../Cargo.toml",
         "../package.json"
       ]
@@ -23,8 +24,8 @@
         "./build.rs",
         "./package.json",
         "./Cargo.toml",
-        "../core/src/**/*",
-        "../core/Cargo.toml",
+        "../oxide/src/**/*",
+        "../oxide/Cargo.toml",
         "../Cargo.toml",
         "../package.json"
       ],
@@ -40,5 +41,8 @@
       "cache": false,
       "persistent": true
     }
-  }
+  },
+  // If rustup is installed outside of the default ~/.rustup directory, we need
+  // to pass the path through to the individual rust tasks.
+  "globalPassThroughEnv": ["RUSTUP_HOME"]
 }

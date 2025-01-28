@@ -1,4 +1,4 @@
-import { scanDir } from '@tailwindcss/oxide'
+import { Scanner } from '@tailwindcss/oxide'
 import { bench } from 'vitest'
 import { compile } from '.'
 
@@ -7,9 +7,12 @@ const root = process.env.FOLDER || process.cwd()
 const css = String.raw
 
 bench('compile', async () => {
-  let { candidates } = scanDir({ base: root, globs: true })
+  let scanner = new Scanner({ sources: [{ base: root, pattern: '**/*' }] })
+  let candidates = scanner.scan()
 
-  compile(css`
+  let { build } = await compile(css`
     @tailwind utilities;
-  `).build(candidates)
+  `)
+
+  build(candidates)
 })
